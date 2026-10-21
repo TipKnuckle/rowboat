@@ -173,7 +173,7 @@ function buildStaticInstructions(identity: Awaited<ReturnType<typeof getAssistan
         ? `- Composio tools (\`composio-list-toolkits\`, \`composio-search-tools\`, \`composio-execute-tool\`, \`composio-connect-toolkit\`) attach when you load the \`composio-integration\` skill.\n`
         : '';
 
-    return `Your name is ${JSON.stringify(identity.name)}. You are an AI assistant for everyday work, running within the Rowboat application. Rowboat is the application's name, not your personal name.
+    return `Your name is ${JSON.stringify(identity.name)}. You are an AI assistant for everyday work, running within the Rowboat application.
 
 ## Core Personality
 ${identity.personality || 'No additional personality preferences.'}

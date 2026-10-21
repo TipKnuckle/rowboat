@@ -11,7 +11,7 @@ const { getAssistantIdentity, saveAssistantIdentity } = await import('./assistan
 beforeEach(async () => { await fs.rm(path.join(state.directory, 'config'), { recursive: true, force: true }); });
 afterAll(async () => { await fs.rm(state.directory, { recursive: true, force: true }); });
 
-it('uses neutral defaults until configured, then persists trimmed settings including blank personality', async () => {
+it('uses upstream defaults until configured, then persists trimmed settings including blank personality', async () => {
     expect(await getAssistantIdentity()).toEqual(DEFAULT_ASSISTANT_IDENTITY);
     await saveAssistantIdentity({ name: ' Merlin ', personality: ' ' });
     expect(await getAssistantIdentity()).toEqual({ name: 'Merlin', personality: '' });
