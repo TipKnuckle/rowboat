@@ -29,7 +29,7 @@ cd apps/harbor && pnpm install && pnpm -r build
 cd ../x && pnpm install && npm test
 ```
 
-**zod is pinned to one version (4.2.1) in both workspaces.** A mismatch breaks type identity across the link. CI (`.github/workflows/x-tests.yml`) builds harbor first in every job, including release builds.
+**zod is pinned to one version (4.2.1) in both workspaces.** A mismatch breaks type identity across the link. Build harbor first when building or testing locally. This fork has no GitHub Actions workflows.
 
 ## Rules that hold everywhere
 
