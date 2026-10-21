@@ -43,8 +43,9 @@ import { useModels } from "@/hooks/use-models"
 import { SidebarSettings } from "@/components/settings/sidebar-settings"
 import { SearchSettings } from "@/components/settings/search-settings"
 import { ToolInventorySettings } from "@/components/settings/tool-inventory-settings"
+import { AssistantIdentitySettings } from "@/components/settings/assistant-identity-settings"
 
-export type ConfigTab = "account" | "connections" | "mobile" | "phone" | "models" | "mcp" | "security" | "code-mode" | "appearance" | "shortcuts" | "notifications" | "permissions" | "note-tagging" | "advanced" | "help" | "search" | "tools"
+export type ConfigTab = "account" | "connections" | "mobile" | "phone" | "models" | "mcp" | "security" | "code-mode" | "appearance" | "shortcuts" | "notifications" | "permissions" | "note-tagging" | "advanced" | "help" | "search" | "tools" | "assistant"
 
 interface TabConfig {
   id: ConfigTab
@@ -55,6 +56,7 @@ interface TabConfig {
 }
 
 const tabs: TabConfig[] = [
+  { id: "assistant", label: "Assistant", icon: MessageCircle, description: "Name and personality" },
   { id: "tools", label: "Tool inventory", icon: Wrench, description: "Inspect agent tools and permissions" },
   { id: "search", label: "Search", icon: Search, description: "Configure web search providers" },
   {
@@ -156,7 +158,7 @@ const tabs: TabConfig[] = [
 /** Sidebar nav grouping: identity first, capabilities, then app-level. */
 const NAV_SECTIONS: { label: string | null; ids: ConfigTab[] }[] = [
   { label: null, ids: ["account", "connections", "mobile", "phone"] },
-  { label: "Configure", ids: ["models", "search", "tools", "mcp", "security", "code-mode", "note-tagging", "advanced"] },
+  { label: "Configure", ids: ["assistant", "models", "search", "tools", "mcp", "security", "code-mode", "note-tagging", "advanced"] },
   { label: "App", ids: ["appearance", "shortcuts", "notifications", "permissions", "help"] },
 ]
 
@@ -2105,6 +2107,8 @@ export function SettingsDialog({ children, defaultTab = "account", open: control
             <div className={cn("flex-1 px-6 pb-5 min-h-0", isJsonTab ? "overflow-hidden" : activeTab === "note-tagging" ? "overflow-hidden flex flex-col" : "overflow-y-auto")}>
               {activeTab === "tools" ? (
                 <ToolInventorySettings />
+              ) : activeTab === "assistant" ? (
+                <AssistantIdentitySettings />
               ) : activeTab === "search" ? (
                 <SearchSettings />
               ) : activeTab === "account" ? (

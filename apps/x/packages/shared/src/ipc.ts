@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AssistantIdentity } from './assistant-identity.js';
 import { SearchSettingsStatus, SearchSettingsUpdate, SearchSelection } from './search-settings.js';
 import { ToolInventory } from './tool-inventory.js';
 import { LocalMailQuery, LocalMailThreadId, LocalMailSummary, LocalMailMessage, LocalMailStatus } from './local-mail.js';
@@ -178,6 +179,8 @@ const UpdaterStatusSchema = z.object({
 });
 
 export const ipcSchemas = {
+  'assistant:getIdentity': { req: z.null(), res: AssistantIdentity },
+  'assistant:saveIdentity': { req: AssistantIdentity, res: AssistantIdentity },
   'localMail:status': { req: z.null(), res: LocalMailStatus },
   'localMail:search': { req: LocalMailQuery, res: z.array(LocalMailSummary) },
   'localMail:read': { req: z.object({ thread: LocalMailThreadId }), res: z.array(LocalMailMessage) },

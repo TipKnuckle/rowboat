@@ -857,6 +857,8 @@ export function setupIpcHandlers() {
     'localMail:read': async (_event, args) => localFirstRpcHandlers['localMail:read'](args),
     'tools:inventory': async (_event, args) => localFirstRpcHandlers['tools:inventory'](args),
     'search:getSettings': async () => localFirstRpcHandlers['search:getSettings'](),
+    'assistant:getIdentity': async () => localFirstRpcHandlers['assistant:getIdentity'](),
+    'assistant:saveIdentity': async (_event, args) => localFirstRpcHandlers['assistant:saveIdentity'](args),
     'search:saveSettings': async (_event, args) => localFirstRpcHandlers['search:saveSettings'](args),
     'search:test': async (_event, args) => localFirstRpcHandlers['search:test'](args),
     'app:getVersions': async () => {

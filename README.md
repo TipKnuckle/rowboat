@@ -290,6 +290,12 @@ In this fork, **Settings → Appearance → Sidebar shortcuts** controls Meeting
 
 With Sign in to Rowboat hidden, the signed-out account avatar and label are replaced by a simple Settings shortcut.
 
+**Settings → Assistant** edits the assistant's name and personality without
+exposing its tool-use or task instructions. The defaults are “Assistant” and a
+plain, practical tone; a blank personality adds no extra style instructions.
+Settings live in the backend's `config/assistant-identity.json`. Start a new
+chat after saving; existing conversations may retain earlier instructions.
+
 This fork has no product telemetry SDKs, event reporting, installation tracking
 IDs, or telemetry opt-in. Local chat history and token counts remain available.
 Selected model providers, search engines, and explicitly connected services

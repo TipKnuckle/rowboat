@@ -10,6 +10,8 @@ import type { ipc } from '@x/shared';
 // (`{type:'subscribe', topic:'turn-deltas', turnId}`), not HTTP.
 export const RPC_CHANNELS = [
   'search:getSettings',
+  'assistant:getIdentity',
+  'assistant:saveIdentity',
   'search:saveSettings',
   'search:test',
   'tools:inventory',

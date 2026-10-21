@@ -19,6 +19,7 @@ import { composioAccountsRepo } from "../../../composio/repo.js";
 import { CURATED_TOOLKITS } from "@x/shared/dist/composio.js";
 import { knowledgeSourcesRepo } from "../../../knowledge/sources/repo.js";
 import { listApps } from "../../../apps/indexer.js";
+import { getAssistantIdentity } from "../../../config/assistant-identity.js";
 
 const runtimeContextPrompt = getRuntimeContextPrompt(getRuntimeContext());
 
@@ -91,7 +92,7 @@ Load the \`composio-integration\` skill when the user asks to interact with any 
 `;
 }
 
-function buildStaticInstructions(composioEnabled: boolean, catalog: string, codeModeEnabled: boolean = true, slackConnected: boolean = false, slackChannelsHint: string = '', emailProvider: EmailProviderName = null, spacesConnected: boolean = false): string {
+function buildStaticInstructions(identity: Awaited<ReturnType<typeof getAssistantIdentity>>, composioEnabled: boolean, catalog: string, codeModeEnabled: boolean = true, slackConnected: boolean = false, slackChannelsHint: string = '', emailProvider: EmailProviderName = null, spacesConnected: boolean = false): string {
     const emailConnected = emailProvider !== null;
     const emailProduct = emailProductName(emailProvider);
 
@@ -172,15 +173,10 @@ function buildStaticInstructions(composioEnabled: boolean, catalog: string, code
         ? `- Composio tools (\`composio-list-toolkits\`, \`composio-search-tools\`, \`composio-execute-tool\`, \`composio-connect-toolkit\`) attach when you load the \`composio-integration\` skill.\n`
         : '';
 
-    return `You are Rowboat Copilot - an AI assistant for everyday work. You help users with anything they want. For instance, drafting emails, prepping for meetings, tracking projects, or answering questions - with memory that compounds from their emails, calendar, and notes. Everything runs locally on the user's machine. The nerdy coworker who remembers everything.
-
-You're an insightful, encouraging assistant who combines meticulous clarity with genuine enthusiasm and gentle humor.
+    return `Your name is ${JSON.stringify(identity.name)}. You are an AI assistant for everyday work, running within the Rowboat application. Rowboat is the application's name, not your personal name.
 
 ## Core Personality
-- **Supportive thoroughness:** Patiently explain complex topics clearly and comprehensively.
-- **Lighthearted interactions:** Maintain a friendly tone with subtle humor and warmth.
-- **Adaptive teaching:** Flexibly adjust explanations based on perceived user proficiency.
-- **Confidence-building:** Foster intellectual curiosity and self-assurance.
+${identity.personality || 'No additional personality preferences.'}
 
 ## Interaction Style
 - Do not end with opt-in questions or hedging closers.
@@ -425,13 +421,16 @@ Never output raw file paths in plain text when they could be wrapped in a filepa
 /** Keep backward-compatible export for any external consumers */
 
 let cachedInstructions: string | null = null;
+let cachedIdentityKey: string | null = null;
 
 export function invalidateCopilotInstructionsCache(): void {
     cachedInstructions = null;
 }
 
 export async function buildCopilotInstructions(): Promise<string> {
-    if (cachedInstructions !== null) return cachedInstructions;
+    const identity = await getAssistantIdentity();
+    const identityKey = JSON.stringify(identity);
+    if (cachedInstructions !== null && cachedIdentityKey === identityKey) return cachedInstructions;
     // Connection facts come from the shared checks in connections.ts — the
     // same source the skill catalog's availability gating uses.
     const [composioEnabled, codeModeEnabled, slackConnected, emailProvider, spacesConnected] =
@@ -466,9 +465,10 @@ export async function buildCopilotInstructions(): Promise<string> {
     // the live skill set so disk skills added/removed at runtime (after
     // refreshDiskSkills + cache invalidation) are reflected.
     const catalog = await buildAvailableSkillCatalog();
-    const baseInstructions = buildStaticInstructions(composioEnabled, catalog, codeModeEnabled, slackConnected, slackChannelsHint, emailProvider, spacesConnected);
+    const baseInstructions = buildStaticInstructions(identity, composioEnabled, catalog, codeModeEnabled, slackConnected, slackChannelsHint, emailProvider, spacesConnected);
     const composioPrompt = await getComposioToolsPrompt(slackConnected, emailProvider);
     const appsPrompt = await getInstalledAppsPrompt();
+    cachedIdentityKey = identityKey;
     cachedInstructions = baseInstructions
         + (composioPrompt ? '\n' + composioPrompt : '')
         + (appsPrompt ? '\n' + appsPrompt : '');

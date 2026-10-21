@@ -1,7 +1,7 @@
 # Running rowboat-server on a remote machine
 
 Core runs on one authoritative host; desktop and phone apps are clients.
-Search keys, tool discovery, and the notmuch mail index belong to that host.
+Search keys, assistant identity, tool discovery, and the notmuch mail index belong to that host.
 Sidebar visibility is a per-client preference. The server exposes the same
 validated IPC schemas over authenticated `POST /rpc/{channel}`; remote errors
 do not fall back to executing the new features on the client machine.
@@ -34,7 +34,7 @@ remain stable. The access code is a secret granting full account access.
 Alternatively launch the desktop with `ROWBOAT_REMOTE_SERVER` and
 `ROWBOAT_REMOTE_TOKEN` set as shown below. Model and search settings saved from
 that client now live on Dagonet. The client must include this fork's UI changes
-to show Search, Tool inventory, and Local mail.
+to show Assistant identity, Search, Tool inventory, and Local mail.
 Restored assistant tabs, layout, and drafts are kept separately for each server
 URL and for local mode. Changing a server's URL starts a fresh tab layout;
 its saved conversations remain available in server history.

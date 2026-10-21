@@ -105,6 +105,8 @@ describe('rowboat-server transport', () => {
       handlers: stubHandlers({
         'sessions:list': async () => ({ sessions: [] }),
         'search:getSettings': async () => ({ provider: 'tavily', configured: { exa: false, tavily: true, firecrawl: false }, rowboatAvailable: false, available: true }),
+        'assistant:getIdentity': async () => ({ name: 'Assistant', personality: '' }),
+        'assistant:saveIdentity': async args => args,
         'search:saveSettings': async args => ({ provider: args.provider, configured: { exa: false, tavily: true, firecrawl: false }, rowboatAvailable: false, available: true }),
         'search:test': async () => ({ success: true, count: 1 }),
         'tools:inventory': async () => ({ tools: [], notices: ['server inventory'] }),
@@ -156,6 +158,8 @@ describe('rowboat-server transport', () => {
 
   it.each([
     ['search:getSettings', null],
+    ['assistant:getIdentity', null],
+    ['assistant:saveIdentity', { name: 'Merlin', personality: 'Be concise.' }],
     ['search:saveSettings', { provider: 'tavily', keys: { tavily: 'test-key' } }],
     ['search:test', { provider: 'tavily' }],
     ['tools:inventory', { includeMcp: false }],
@@ -169,7 +173,7 @@ describe('rowboat-server transport', () => {
   });
 
   it('validates migrated search and mail requests before invoking handlers', async () => {
-    for (const [channel, args] of [['search:saveSettings', { provider: 'unknown' }], ['localMail:read', { thread: '--help' }]]) {
+    for (const [channel, args] of [['assistant:saveIdentity', { name: '', personality: '' }], ['search:saveSettings', { provider: 'unknown' }], ['localMail:read', { thread: '--help' }]]) {
       expect((await fetch(`${base}/rpc/${channel}`, authed({ method: 'POST', body: JSON.stringify(args) }))).status).toBe(400);
     }
   });
