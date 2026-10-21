@@ -1,5 +1,17 @@
 # Rowboat monorepo
 
+## Fork direction
+
+This is Craig's personal fork for solo development and tinkering. The goal is an app that works on his machine by default, with cloud features optional. This is a direction for future changes, not a claim that every existing feature already works locally.
+
+- Prioritize local use, minimal setup, and minimal reliance on external services.
+- Ask before introducing required cloud services, accounts, or recurring costs.
+- Prefer small, understandable changes that solve a current need. Add infrastructure or abstractions when a concrete use case requires them.
+- Upstream compatibility is useful, but it is not mandatory when it conflicts with this fork's goals.
+- Work autonomously on routine, reversible implementation choices within the requested scope.
+
+## Project layout
+
 Two applications, each its own pnpm workspace, plus product docs. Each area keeps its own guide; this file holds only what is true everywhere.
 
 | Path | What | Guide |
@@ -21,7 +33,7 @@ cd ../x && pnpm install && npm test
 
 ## Rules that hold everywhere
 
-- Comments explain **why**, with the date and the decision or PR they implement. The code says what.
-- Documents own one kind of fact each and link to each other rather than restate. There are no status documents: status is the PR description and `git log`.
-- A PR that changes a documented behavior changes the document in the same PR. For harbor the three questions are in its guide.
-- Nothing speculative: no seat reserved for a rule or a feature that has no route yet.
+- Comments explain **why** when the reason is not clear from the code. Dates and PR references are optional.
+- Keep documentation proportional to the change. Update affected instructions or documented behavior alongside the code, and link to existing explanations rather than duplicating them. A PR or formal status document is not required for everyday local work.
+- Run checks appropriate to the change, focusing on affected behavior and meaningful regressions.
+- Preserve the technical constraints and architectural invariants in area-specific guides until an intentional implementation change replaces them. This fork's workflow preferences above supersede inherited requirements for dated comments, PR references, and PR-based documentation rituals, including those in area-specific guides.
