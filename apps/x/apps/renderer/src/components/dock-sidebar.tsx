@@ -69,6 +69,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "@/lib/toast"
 import * as analytics from '@/lib/analytics'
 import { getPinnedApps, onPinnedAppsChanged, unpinApp } from "@/lib/pinned-apps"
+import { useSidebarPreferences } from "@/lib/sidebar-preferences"
 import { isOutOfCredits, CREDIT_EXHAUSTED_EVENT, CREDIT_REPLENISHED_EVENT } from "@/lib/credit-status"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { SidebarCreditRewards } from "@/components/sidebar-credit-rewards"
@@ -597,6 +598,7 @@ export function DockSidebar({
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [switcherIndex, setSwitcherIndex] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const sidebarPreferences = useSidebarPreferences()
   const [connectionsSettingsOpen, setConnectionsSettingsOpen] = useState(false)
   const [syncLogOpen, setSyncLogOpen] = useState(false)
 
@@ -1084,8 +1086,15 @@ export function DockSidebar({
         },
       },
     ]
-    return items
+    return items.filter(row => {
+      if (!('item' in row)) return true
+      const { item } = row
+      if (item.key === 'meetings') return sidebarPreferences.meetings || meetingIsRecording
+      if (item.key === 'apps' || item.key.startsWith('app:')) return sidebarPreferences.apps
+      return true
+    })
   }, [
+    sidebarPreferences,
     activeNav, closeFlyouts, onOpenHome, unreadEmailCount, previewEmail, onOpenEmail,
     meetingIsRecording, meetingSublabel, onOpenMeetings,
     knowledgeUpdatedLabel, knowledgeActions, onOpenApps, pinnedApps, onOpenApp,
@@ -1272,14 +1281,14 @@ export function DockSidebar({
       case 'settings':
         return (
           <>
-            <ContextMenuItem onClick={() => setConnectionsSettingsOpen(true)}>
+            {sidebarPreferences.connections && <ContextMenuItem onClick={() => setConnectionsSettingsOpen(true)}>
               <Plug className="mr-2 size-3.5" /> Connect accounts
               {hasOauthError && <span className="ml-auto size-1.5 rounded-full bg-amber-500" />}
-            </ContextMenuItem>
+            </ContextMenuItem>}
             <ContextMenuItem onClick={() => setSyncLogOpen(true)}>
               <History className="mr-2 size-3.5" /> Sync activity
             </ContextMenuItem>
-            {onStartTour && (
+            {sidebarPreferences.tour && onStartTour && (
               <ContextMenuItem onClick={onStartTour}>
                 <MascotFaceIcon className="mr-2 size-3.5" /> Take a tour
               </ContextMenuItem>
@@ -1297,7 +1306,7 @@ export function DockSidebar({
                 </ContextMenuItem>
               )
             ) : (
-              <ContextMenuItem disabled={loggingIn} onClick={() => void handleRowboatLogin()}>
+              sidebarPreferences.signIn && <ContextMenuItem disabled={loggingIn} onClick={() => void handleRowboatLogin()}>
                 <LogIn className="mr-2 size-3.5" />
                 {loggingIn ? 'Signing in…' : 'Sign in to Rowboat'}
               </ContextMenuItem>

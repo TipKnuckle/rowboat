@@ -11,6 +11,9 @@ import {
 } from '@x/core/dist/auth/oauth-flows.js';
 import { watcher as watcherCore, workspace } from '@x/core';
 import { WorkDir } from '@x/core/dist/config/config.js';
+import { getSearchSettings, saveSearchSettings, searchWeb } from '@x/core/dist/config/search.js';
+import { getToolInventory } from '@x/core/dist/runtime/tools/inventory.js';
+import { localMailStatus, searchLocalMail, readLocalMailThread } from '@x/core/dist/knowledge/email/local-mail.js';
 import { workspace as workspaceShared } from '@x/shared';
 import * as mcpCore from '@x/core/dist/mcp/mcp.js';
 import * as runsCore from '@x/core/dist/runtime/legacy/runs.js';
@@ -855,6 +858,16 @@ export function setupIpcHandlers() {
   void warmSentContacts();
 
   registerIpcHandlers({
+    'localMail:status': async () => localMailStatus(),
+    'localMail:search': async (_event, args) => searchLocalMail(args),
+    'localMail:read': async (_event, args) => readLocalMailThread(args.thread),
+    'tools:inventory': async (_event, args) => getToolInventory(args.includeMcp),
+    'search:getSettings': async () => getSearchSettings(),
+    'search:saveSettings': async (_event, args) => saveSearchSettings(args),
+    'search:test': async (_event, args) => {
+      const result = await searchWeb({ query: 'web search', numResults: 1, provider: args.provider });
+      return result.success ? { success: true, count: result.count } : result;
+    },
     'app:getVersions': async () => {
       // args is null for this channel (no request payload)
       return getVersions();

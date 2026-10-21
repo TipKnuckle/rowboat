@@ -75,6 +75,7 @@ import {
 } from "@/components/ui/context-menu"
 import { cn } from "@/lib/utils"
 import { getPinnedApps, onPinnedAppsChanged, unpinApp } from "@/lib/pinned-apps"
+import { useSidebarPreferences } from "@/lib/sidebar-preferences"
 import { isOutOfCredits, CREDIT_EXHAUSTED_EVENT, CREDIT_REPLENISHED_EVENT } from "@/lib/credit-status"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { SidebarCreditRewards } from "@/components/sidebar-credit-rewards"
@@ -494,6 +495,7 @@ export function SidebarContentPanel({
   const [connectionsSettingsOpen, setConnectionsSettingsOpen] = useState(false)
   const [openConnectionsAfterClose, setOpenConnectionsAfterClose] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const sidebarPreferences = useSidebarPreferences()
   const [isRowboatConnected, setIsRowboatConnected] = useState(false)
   const [creditPopoverOpen, setCreditPopoverOpen] = useState(false)
   // 2026-10-07: the sidebar collapses offcanvas, sliding the plan card off-screen,
@@ -961,7 +963,7 @@ export function SidebarContentPanel({
                 </SidebarMenuButton>
               </RowTip>
             </SidebarMenuItem>
-            <SidebarMenuItem>
+            {(sidebarPreferences.meetings || meetingIsRecording) && <SidebarMenuItem>
               <RowTip tip={meetingTip}>
                 <SidebarMenuButton data-tour-id="nav-meetings" isActive={activeNav === 'meetings'} onClick={onOpenMeetings}>
                   <Mic className={cn(meetingIsRecording && 'text-red-500!')} />
@@ -1031,7 +1033,7 @@ export function SidebarContentPanel({
                   )}
                 </div>
               ) : null}
-            </SidebarMenuItem>
+            </SidebarMenuItem>}
             <SidebarMenuItem>
               <SidebarMenuButton data-tour-id="nav-home" isActive={activeNav === 'home'} onClick={onOpenHome}>
                 <ListTodo />
@@ -1082,14 +1084,14 @@ export function SidebarContentPanel({
                 </SidebarMenuButton>
               </RowTip>
             </SidebarMenuItem>
-            <SidebarMenuItem>
+            {sidebarPreferences.apps && <SidebarMenuItem>
               <SidebarMenuButton data-tour-id="nav-apps" isActive={activeNav === 'apps'} onClick={onOpenApps}>
                 <LayoutGrid />
                 <span className="flex-1 truncate">Apps</span>
                 <Keys keys={SHORTCUTS.apps} className="sb-row-keys" />
               </SidebarMenuButton>
-            </SidebarMenuItem>
-            {pinnedApps.map(({ folder, name }) => (
+            </SidebarMenuItem>}
+            {sidebarPreferences.apps && pinnedApps.map(({ folder, name }) => (
               <SidebarMenuItem key={folder}>
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
@@ -1301,7 +1303,7 @@ export function SidebarContentPanel({
                         </button>
                       </div>
                     )
-                  ) : (
+                  ) : sidebarPreferences.signIn && (
                     <button
                       type="button"
                       onClick={handleRowboatLogin}
@@ -1311,12 +1313,12 @@ export function SidebarContentPanel({
                       {loggingIn ? 'Signing in…' : 'Sign in to Rowboat'}
                     </button>
                   )}
-                  <DropdownMenuItem onSelect={() => setConnectionsSettingsOpen(true)}>
+                  {sidebarPreferences.connections && <DropdownMenuItem onSelect={() => setConnectionsSettingsOpen(true)}>
                     <Plug />
                     Connect accounts
                     {hasOauthError && <AlertTriangle className="ml-auto text-amber-500" aria-label="Needs attention" />}
-                  </DropdownMenuItem>
-                  {onStartTour && (
+                  </DropdownMenuItem>}
+                  {sidebarPreferences.tour && onStartTour && (
                     <DropdownMenuItem onSelect={onStartTour}>
                       <MascotFaceIcon className="size-4" />
                       Take a tour
@@ -1330,7 +1332,7 @@ export function SidebarContentPanel({
                 </DropdownMenuContent>
               </DropdownMenu>
               {!isRowboatConnected ? (
-                <button type="button" className="sb-plan-pill" onClick={handleRowboatLogin} disabled={loggingIn}>
+                sidebarPreferences.signIn && <button type="button" className="sb-plan-pill" onClick={handleRowboatLogin} disabled={loggingIn}>
                   {loggingIn ? 'Signing in…' : 'Sign in'}
                 </button>
               ) : billing && (

@@ -38,6 +38,12 @@ const input = {
 };
 
 describe("RealPermissionChecker", () => {
+    it("shows human questions without a separate tool approval", async () => {
+        const { checker, calls } = makeChecker(new Error("must not be called"));
+        expect(await checker.check({ ...input, toolId: "builtin:ask-human", toolName: "ask-human", input: { question: "Which mailbox?" } })).toEqual({ required: false });
+        expect(calls).toEqual([]);
+        expect(await checker.check({ ...input, toolId: "mcp:server:ask-human", toolName: "ask-human" })).toMatchObject({ required: true });
+    });
     it("gates builtins through getToolPermissionMetadata with empty session grants", async () => {
         const metadata = { kind: "command" as const, commandNames: ["rm"] };
         const { checker, calls } = makeChecker(metadata);

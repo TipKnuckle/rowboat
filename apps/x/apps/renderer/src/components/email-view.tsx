@@ -17,6 +17,7 @@ import { useTheme } from '@/contexts/theme-context'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { LocalMailView } from '@/components/local-mail-view'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -2682,7 +2683,26 @@ export type EmailViewProps = {
   onOpenNote?: (path: string) => void
 }
 
-export function EmailView({ initialThreadId, threadIdVersion, initialSearchQuery, searchQueryVersion, onOpenNote }: EmailViewProps = {}) {
+export function EmailView(props: EmailViewProps = {}) {
+  const [source, setSource] = useState<'local' | 'connected'>(() => {
+    if (props.initialThreadId || props.initialSearchQuery) return 'connected'
+    try { return localStorage.getItem('x:mail-source') === 'connected' ? 'connected' : 'local' } catch { return 'local' }
+  })
+  useEffect(() => {
+    if (props.initialThreadId || props.initialSearchQuery) setSource('connected')
+  }, [props.initialThreadId, props.threadIdVersion, props.initialSearchQuery, props.searchQueryVersion])
+  return <div className="flex h-full min-h-0 flex-col">
+    <div className="flex gap-2 border-b px-4 py-2" aria-label="Mail source">
+      {(['local', 'connected'] as const).map(value => <Button key={value} variant={source === value ? 'secondary' : 'ghost'} size="sm" aria-pressed={source === value} onClick={() => {
+        setSource(value)
+        try { localStorage.setItem('x:mail-source', value) } catch { /* Keep the current selection for this window. */ }
+      }}>{value === 'local' ? 'Local mail' : 'Connected account'}</Button>)}
+    </div>
+    <div className="min-h-0 flex-1">{source === 'local' ? <LocalMailView /> : <ConnectedEmailView {...props} />}</div>
+  </div>
+}
+
+function ConnectedEmailView({ initialThreadId, threadIdVersion, initialSearchQuery, searchQueryVersion, onOpenNote }: EmailViewProps = {}) {
   const [important, setImportant] = useState<SectionState>(() => clearLoadingFlag(persistedImportant))
   const [other, setOther] = useState<SectionState>(() => clearLoadingFlag(persistedOther))
   const hadPersistedDataOnMount = useRef(persistedImportant !== null)

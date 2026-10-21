@@ -33,6 +33,7 @@ import { imageTools } from "./domains/image.js";
 import { spacesTools } from "./domains/spaces.js";
 import { whiteboardTools } from "./domains/whiteboard.js";
 import { BuiltinToolsSchema } from "./types.js";
+import { localMailTools } from "./domains/local-mail.js";
 export { coalesceCodeRunEvents } from "./domains/code.js";
 
 // The builtin-tool catalog, assembled from domain modules
@@ -141,6 +142,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
             return result.output;
         },
     },
+    ...localMailTools,
 };
 
 // Native ToolDescriptors for a skill's declared tools. Unknown names are

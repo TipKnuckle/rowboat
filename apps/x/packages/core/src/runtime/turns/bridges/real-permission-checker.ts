@@ -65,6 +65,9 @@ export class RealPermissionChecker implements IPermissionChecker {
         }
 
         const name = input.toolId.slice("builtin:".length);
+        // The runtime owns this question tool outside the executable catalog.
+        // Showing a question needs no separate approval to ask it.
+        if (name === "ask-human") return { required: false };
         const policy = this.getPolicy(name);
         switch (policy) {
             case "none":

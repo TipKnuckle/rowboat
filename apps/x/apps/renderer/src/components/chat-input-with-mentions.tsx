@@ -494,22 +494,19 @@ function ChatInputInner({
     toast.success('Work directory cleared')
   }, [onWorkDirChange, isCodeLocked])
 
-  // Check search tool availability (exa or signed-in via gateway)
+  // The composer and agent use the same selected provider and availability.
   useEffect(() => {
+    let cancelled = false
     const checkSearch = async () => {
-      if (isRowboatConnected) {
-        setSearchAvailable(true)
-        return
-      }
       let available = false
       try {
-        const raw = await window.ipc.invoke('workspace:readFile', { path: 'config/exa-search.json' })
-        const config = JSON.parse(raw.data)
-        if (config.apiKey) available = true
+        available = (await window.ipc.invoke('search:getSettings', null)).available
       } catch { /* not configured */ }
-      setSearchAvailable(available)
+      if (!cancelled) setSearchAvailable(available)
     }
-    checkSearch()
+    void checkSearch()
+    window.addEventListener('search-settings-changed', checkSearch)
+    return () => { cancelled = true; window.removeEventListener('search-settings-changed', checkSearch) }
   }, [isActive, isRowboatConnected])
 
   // Selecting here is PER-CHAT: it affects the next run created from this

@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { SearchSettingsStatus, SearchSettingsUpdate, SearchSelection } from './search-settings.js';
+import { ToolInventory } from './tool-inventory.js';
+import { LocalMailQuery, LocalMailThreadId, LocalMailSummary, LocalMailMessage, LocalMailStatus } from './local-mail.js';
 import { UseCase } from './analytics.js';
 import { DeckOutline, DeckOutlineSlide, EditSlideRequest, GenerateDeckOutlineRequest, GenerateSlideRequest } from './deck.js';
 import { RelPath, Encoding, Stat, DirEntry, ReaddirOptions, ReadFileResult, WorkspaceChangeEvent, WriteFileOptions, WriteFileResult, RemoveOptions } from './workspace.js';
@@ -175,6 +178,13 @@ const UpdaterStatusSchema = z.object({
 });
 
 export const ipcSchemas = {
+  'localMail:status': { req: z.null(), res: LocalMailStatus },
+  'localMail:search': { req: LocalMailQuery, res: z.array(LocalMailSummary) },
+  'localMail:read': { req: z.object({ thread: LocalMailThreadId }), res: z.array(LocalMailMessage) },
+  'tools:inventory': { req: z.object({ includeMcp: z.boolean() }), res: ToolInventory },
+  'search:getSettings': { req: z.null(), res: SearchSettingsStatus },
+  'search:saveSettings': { req: SearchSettingsUpdate, res: SearchSettingsStatus },
+  'search:test': { req: z.object({ provider: SearchSelection }), res: z.object({ success: z.boolean(), error: z.string().optional(), count: z.number().optional() }) },
   'app:getVersions': {
     req: z.null(),
     res: z.object({

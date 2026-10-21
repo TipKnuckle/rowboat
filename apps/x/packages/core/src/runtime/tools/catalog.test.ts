@@ -310,8 +310,8 @@ describe("bundled skills declare real builtin tools", () => {
 });
 
 describe("BuiltinTools catalog key order", () => {
-    it("preserves the historical key order byte-for-byte", () => {
-        expect(Object.keys(BuiltinTools)).toEqual(HISTORICAL_KEY_ORDER);
+    it("preserves the historical key order and appends local mail tools", () => {
+        expect(Object.keys(BuiltinTools)).toEqual([...HISTORICAL_KEY_ORDER, 'local-mail-search', 'local-mail-read']);
     });
 });
 

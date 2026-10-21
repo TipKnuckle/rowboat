@@ -32,6 +32,8 @@ export const COPILOT_BASE_TOOLS: readonly string[] = [
     "parseFile",
     "LLMParse",
     "web-search",
+    "local-mail-search",
+    "local-mail-read",
     "fetch-url",
     "save-to-memory",
     // "Add X to my list" must work in any chat — the to-do list is the home

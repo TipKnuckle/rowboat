@@ -249,13 +249,13 @@ To enable voice output (optional), add an ElevenLabs API key in `~/.rowboat/conf
 
 ### Web search
 
-To use Exa research search (optional), add the Exa API key in `~/.rowboat/config/exa-search.json`
+Use **Settings → Search** to configure Exa, Tavily, or Firecrawl. See [fork preferences](#local-first-fork-preferences) for provider selection, testing, and legacy Exa configuration support.
 
 ### External tools
 
 To enable external tools (optional), you can add any MCP server or use Composio tools by adding an API key in `~/.rowboat/config/composio.json`
 
-All API key files use the same format:
+The voice and Composio API key files use this format:
 ```
 {
   "apiKey": "<key>"
@@ -283,6 +283,26 @@ Rowboat works with the model setup you prefer:
 - Swap models anytime — your data stays in your local Markdown vault
 
 ## Extend Rowboat with tools (MCP)
+
+### Local-first fork preferences
+
+In this fork, **Settings → Appearance → Sidebar shortcuts** controls Meetings, Apps (including pinned apps), Take a tour, Sign in to Rowboat, and Connect accounts in both sidebar layouts. These shortcuts start hidden. Hiding a shortcut does not disable a feature or its background work; an active meeting recording remains visible so it can be stopped. Account and connection settings remain accessible through Settings.
+
+**Settings → Search** configures Exa, [Tavily](https://docs.tavily.com/documentation/api-reference/endpoint/search), or [Firecrawl](https://docs.firecrawl.dev/api-reference/endpoint/search), selects the default provider, and tests it with one search request. The agent's `web-search` tool and composer use that selection. Tests and searches consume the selected provider's quota; there is no automatic fallback to another provider. Rowboat's account-backed search remains an explicit option.
+
+Keys are stored locally in `config/search.json` under the Rowboat work directory (normally `~/.rowboat`), with owner-only file permissions on Unix. They are not encrypted. Existing `config/exa-search.json` keys are recognized until search settings are first saved, and your own Exa key takes priority over account-backed search. Start a new chat after enabling search if an existing chat does not have the tool attached.
+
+**Settings → Tool inventory** lists the running app's built-in and runtime tools, their inputs, permission policies, availability checks, and skill associations. Loading MCP tools contacts configured servers to discover their tools; failures are reported separately. Composio's external catalog remains discoverable through its search tool. Configuration availability does not guarantee a working remote service, and individual agents may expose a smaller tool set.
+
+### Local email (read only)
+
+**Email → Local mail** reads an existing [notmuch](https://notmuchmail.org/) index, including mail synced by mbsync. Install and configure notmuch separately; Rowboat finds common Homebrew/Linux install locations or uses `notmuch` on PATH. The view displays the index location and message count. Use `tag:inbox`, `from:person`, `subject:words`, or `*` to search, and refresh after your sync service updates the index.
+
+The assistant has `local-mail-search` and `local-mail-read` when the index is available. Reading mail through an agent includes the returned content in that agent's model context, so use a local model if you want processing to stay on your machine. The mail view itself reads locally and displays plain text without loading remote images. HTML-only messages and attachments must be opened in your existing mail client. Long bodies are truncated, and reads have time and size limits.
+
+This integration does not run sync, mark messages read, change tags, archive, delete, or send mail. Existing Gmail/Microsoft functionality remains under **Email → Connected account**. The local view starts selected; the last manual source selection is remembered, while existing cloud-mail deep links open the connected account.
+
+### MCP connections
 
 Rowboat can connect to external tools and services via **Model Context Protocol (MCP)**.
 That means you can plug in (for example) search, databases, CRMs, support tools, and automations - or your own internal tools.
