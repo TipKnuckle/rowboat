@@ -9,6 +9,7 @@ import { configureAnalyticsContext } from './lib/analytics'
 import { MeetingDetectedPopup } from '@/components/meeting-detected-popup'
 import { QuickAskBar } from '@/components/quick-ask-bar'
 import { ScreenPointerOverlay } from '@/components/screen-pointer-overlay'
+import { setAssistantPreferenceBackend } from './lib/assistant-dock'
 
 // React's development build records a performance.measure entry (with a
 // serialized `detail`) for every component render — its DevTools
@@ -30,6 +31,13 @@ if (import.meta.env.DEV) {
 // PostHog distinct_id. Falls back to PostHog's auto-generated anonymous ID
 // if the IPC call fails (rare — main is always up before renderer).
 async function bootstrap() {
+  try {
+    const connection = await window.ipc.invoke('server:getConnection', null)
+    setAssistantPreferenceBackend(connection.mode === 'remote' ? connection.url : null)
+  } catch (err) {
+    console.error('[Workspace] Failed to identify backend:', err)
+    setAssistantPreferenceBackend('unknown-backend')
+  }
   let installationId: string | undefined
   let apiUrl: string | undefined
   let appVersion: string | undefined

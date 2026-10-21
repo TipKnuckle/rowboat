@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { createAssistantTab, restoreAssistantTabs, tabsAfterClose } from './assistant-dock'
+import { createAssistantTab, restoreAssistantTabs, tabsAfterClose, setAssistantPreferenceBackend, readAssistantPreference, writeAssistantPreference } from './assistant-dock'
 
 describe('assistant dock tabs', () => {
+  it('keeps local and remote restored chats and drafts separate across reconnects', () => {
+    localStorage.clear()
+    setAssistantPreferenceBackend(null)
+    writeAssistantPreference('rowboat-assistant-tabs', 'local-chat')
+    setAssistantPreferenceBackend('http://192.168.50.60:3220/')
+    expect(readAssistantPreference('rowboat-assistant-tabs')).toBeNull()
+    writeAssistantPreference('rowboat-assistant-tabs', 'remote-chat')
+    setAssistantPreferenceBackend(null)
+    expect(readAssistantPreference('rowboat-assistant-tabs')).toBe('local-chat')
+    setAssistantPreferenceBackend('http://192.168.50.60:3220')
+    expect(readAssistantPreference('rowboat-assistant-tabs')).toBe('remote-chat')
+    writeAssistantPreference('rowboat-assistant-tabs', null)
+    expect(readAssistantPreference('rowboat-assistant-tabs')).toBeNull()
+    setAssistantPreferenceBackend(null)
+    localStorage.clear()
+  })
   it('creates independent draft identities and stable session identities', () => {
     const first = createAssistantTab()
     const second = createAssistantTab()

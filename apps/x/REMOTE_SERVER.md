@@ -35,6 +35,9 @@ Alternatively launch the desktop with `ROWBOAT_REMOTE_SERVER` and
 `ROWBOAT_REMOTE_TOKEN` set as shown below. Model and search settings saved from
 that client now live on Dagonet. The client must include this fork's UI changes
 to show Search, Tool inventory, and Local mail.
+Restored assistant tabs, layout, and drafts are kept separately for each server
+URL and for local mode. Changing a server's URL starts a fresh tab layout;
+its saved conversations remain available in server history.
 
 Validate reachability **from the Mini**, not only the server:
 

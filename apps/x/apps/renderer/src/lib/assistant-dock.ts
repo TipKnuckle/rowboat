@@ -1,15 +1,21 @@
 import type { ChatTab } from '@/components/tab-bar'
 
 export const ASSISTANT_TABS_KEY = 'rowboat-assistant-tabs'
+let preferencePrefix = ''
+
+// 2026-10-21: remote workspaces must not restore chats or drafts owned by this Mac.
+export function setAssistantPreferenceBackend(remoteUrl: string | null): void {
+  preferencePrefix = remoteUrl ? `backend:${encodeURIComponent(remoteUrl.replace(/\/+$/, ''))}:` : ''
+}
 
 export function readAssistantPreference(key: string): string | null {
-  try { return localStorage.getItem(key) } catch { return null }
+  try { return localStorage.getItem(preferencePrefix + key) } catch { return null }
 }
 
 export function writeAssistantPreference(key: string, value: string | null): void {
   try {
-    if (value === null) localStorage.removeItem(key)
-    else localStorage.setItem(key, value)
+    if (value === null) localStorage.removeItem(preferencePrefix + key)
+    else localStorage.setItem(preferencePrefix + key, value)
   } catch { return }
 }
 
