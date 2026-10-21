@@ -347,6 +347,7 @@ export async function stopServerHost(): Promise<void> {
 
 export async function getPairingInfo(): Promise<{
   running: boolean;
+  remote?: boolean;
   name: string;
   port: number | null;
   lanEnabled: boolean;
@@ -357,14 +358,17 @@ export async function getPairingInfo(): Promise<{
     return { running: false, name: os.hostname(), port: null, lanEnabled: false, urls: [], token: null };
   }
   if ('kind' in current && current.kind === 'remote') {
-    // Phones pair directly with the remote server, not through this client.
+    const response = await fetch(`${current.baseUrl}/pairing`, {
+      headers: { authorization: `Bearer ${current.key}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`Could not load server pairing information (${response.status})`);
+    const info = ipc.validateResponse('server:getPairingInfo', await response.json());
+    // The server owns pairing; the Mini must not advertise its own loopback.
     return {
-      running: true,
-      name: new URL(current.baseUrl).hostname,
-      port: Number(new URL(current.baseUrl).port) || null,
-      lanEnabled: false,
-      urls: [current.baseUrl],
-      token: current.key,
+      ...info,
+      remote: true,
+      urls: [...new Set([current.baseUrl, ...info.urls.filter(url => !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname))])],
     };
   }
   const payload = buildPairingPayload(current.port, current.lanEnabled, current.key);

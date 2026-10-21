@@ -292,6 +292,8 @@ In this fork, **Settings → Appearance → Sidebar shortcuts** controls Meeting
 
 Keys are stored locally in `config/search.json` under the Rowboat work directory (normally `~/.rowboat`), with owner-only file permissions on Unix. They are not encrypted. Existing `config/exa-search.json` keys are recognized until search settings are first saved, and your own Exa key takes priority over account-backed search. Start a new chat after enabling search if an existing chat does not have the tool attached.
 
+When connected to a remote backend, these settings, tool discovery, and Local mail all run on the **server**, not the desktop client. Sidebar preferences stay on each client. See [running a headless LAN server](apps/x/REMOTE_SERVER.md#macos-lan-host-dagonet) for deployment and connection instructions.
+
 **Settings → Tool inventory** lists the running app's built-in and runtime tools, their inputs, permission policies, availability checks, and skill associations. Loading MCP tools contacts configured servers to discover their tools; failures are reported separately. Composio's external catalog remains discoverable through its search tool. Configuration availability does not guarantee a working remote service, and individual agents may expose a smaller tool set.
 
 ### Local email (read only)

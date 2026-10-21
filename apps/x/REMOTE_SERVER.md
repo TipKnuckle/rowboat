@@ -1,8 +1,54 @@
 # Running rowboat-server on a remote machine
 
-Phase 8 of SEPARATION_PLAN.md: core runs on a remote box, the desktop app is a
-pure client. This documents the validated path — Tailscale for networking (no
-public exposure, no TLS certs), Ubuntu on EC2 as the host.
+Core runs on one authoritative host; desktop and phone apps are clients.
+Search keys, tool discovery, and the notmuch mail index belong to that host.
+Sidebar visibility is a per-client preference. The server exposes the same
+validated IPC schemas over authenticated `POST /rpc/{channel}`; remote errors
+do not fall back to executing the new features on the client machine.
+
+## macOS LAN host (Dagonet)
+
+From `apps/x`, after building Harbor and installing both workspaces:
+
+```sh
+npm run deps
+pnpm --filter @x/server build:headless
+node scripts/install-headless-macos.mjs
+```
+
+The installer stages a separate release under `~/.local/share/rowboat-server`,
+installs its native dependency, and registers `com.craigt.rowboat-server` as a
+user launch agent. It owns `~/.rowboat`, listens on port 3220 on the LAN, runs
+independently of SSH, and restarts after crashes. It starts at user login;
+starting before login at boot requires a system LaunchDaemon and administrator
+setup. Logs are under `~/Library/Logs/rowboat-server/`. Re-running the installer
+deploys a new release without replacing the data directory. Rebuild/reinstall
+after changing Node versions so native dependencies match.
+
+Do not run a separate local desktop backend against this workdir. On the Mini,
+use **Settings → Phone app → Connect to server** with Dagonet's LAN address
+(`http://192.168.50.60:3220` on the current network) and the contents of
+`~/.rowboat/server-key` on Dagonet. Reserve the host's DHCP address if it should
+remain stable. The access code is a secret granting full account access.
+
+Alternatively launch the desktop with `ROWBOAT_REMOTE_SERVER` and
+`ROWBOAT_REMOTE_TOKEN` set as shown below. Model and search settings saved from
+that client now live on Dagonet. The client must include this fork's UI changes
+to show Search, Tool inventory, and Local mail.
+
+Validate reachability **from the Mini**, not only the server:
+
+```sh
+curl --fail http://192.168.50.60:3220/health
+```
+
+All RPC, mail, and workspace data still require the bearer token. The
+authenticated `GET /pairing` endpoint supplies the server's pairing metadata;
+the desktop's phone QR points at the server and hides client-local network/key
+controls in remote mode. HTTP/WebSocket access here is for the trusted LAN.
+Cloudflare routing and installing a physical phone client are separate steps.
+
+## Ubuntu / Tailscale alternative
 
 ## 1. Provision the box
 

@@ -9,6 +9,13 @@ import type { ipc } from '@x/shared';
 // subscription needs connection identity, so it lives on the WebSocket
 // (`{type:'subscribe', topic:'turn-deltas', turnId}`), not HTTP.
 export const RPC_CHANNELS = [
+  'search:getSettings',
+  'search:saveSettings',
+  'search:test',
+  'tools:inventory',
+  'localMail:status',
+  'localMail:search',
+  'localMail:read',
   'projects:list',
   'projects:createChat',
   'sessions:list',

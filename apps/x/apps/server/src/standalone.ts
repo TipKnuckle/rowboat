@@ -24,13 +24,10 @@ import { setTokenCipher as setGithubTokenCipher } from '@x/core/dist/apps/github
 // Headless rowboat-server: the RFC's end-state entrypoint, where main spawns
 // this as a child process (or it runs on a remote box) and core lives here.
 //
-// UNTIL that flip lands, this must never run against a workdir a live
-// Electron app is using — two core instances over one ~/.rowboat double-run
-// schedulers and split-brain the session index. The pid lockfile plus the
-// Electron app's own single-instance lock make that mistake loud instead of
-// silent. Intended use today: integration tests and dev, always with an
-// isolated ROWBOAT_WORKDIR.
-//
+// This process is authoritative for its workdir. Desktop clients connect
+// remotely instead of starting another core against the same files. Two
+// instances would double-run schedulers and split the session index; the
+// transport's workdir lock rejects a second host.
 
 async function main(): Promise<void> {
   // The workdir lock is acquired by createRowboatServer itself — a live
@@ -106,7 +103,7 @@ async function main(): Promise<void> {
     handlers: createCoreRpcHandlers({ sessionsIndexReady }),
     events: { ...createCoreEventSources(), subscribeWorkspaceEvents, subscribeKnowledgeEvents },
     resolveWorkspacePath,
-    serverVersion: process.env.npm_package_version ?? '0.0.0',
+    serverVersion: process.env.ROWBOAT_SERVER_VERSION ?? process.env.npm_package_version ?? '0.0.0',
   });
 
   console.log(`[server] rowboat-server listening on http://${server.host}:${server.port} (workdir: ${WorkDir})`);

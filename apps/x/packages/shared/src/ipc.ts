@@ -3779,6 +3779,7 @@ export const ipcSchemas = {
     req: z.null(),
     res: z.object({
       running: z.boolean(),
+      remote: z.boolean().optional(),
       // Hostname shown on the phone during pairing.
       name: z.string(),
       port: z.number().nullable(),

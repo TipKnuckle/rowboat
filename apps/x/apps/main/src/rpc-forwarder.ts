@@ -1,5 +1,5 @@
 import { isRpcChannel } from '@x/server';
-import { whenServerReady } from './server-host.js';
+import { whenServerReady, serverHostMode } from './server-host.js';
 
 // Strangler-fig seam (RFC SERVER_CLIENT_SPEC.md Q4/Q15): channels that have
 // migrated to rowboat-server are forwarded over real localhost HTTP instead
@@ -19,7 +19,9 @@ export function forwardingEnabled(): boolean {
 }
 
 export function shouldForwardChannel(channel: string): boolean {
-  return forwardingEnabled() && isRpcChannel(channel);
+  // A remote connection is authoritative even if a local debugging override
+  // disables forwarding. Never substitute the client's data for the server's.
+  return (serverHostMode() === 'remote' || forwardingEnabled()) && isRpcChannel(channel);
 }
 
 export async function forwardRpc(channel: string, args: unknown): Promise<unknown> {

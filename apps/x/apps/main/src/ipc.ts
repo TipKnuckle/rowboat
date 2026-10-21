@@ -11,9 +11,7 @@ import {
 } from '@x/core/dist/auth/oauth-flows.js';
 import { watcher as watcherCore, workspace } from '@x/core';
 import { WorkDir } from '@x/core/dist/config/config.js';
-import { getSearchSettings, saveSearchSettings, searchWeb } from '@x/core/dist/config/search.js';
-import { getToolInventory } from '@x/core/dist/runtime/tools/inventory.js';
-import { localMailStatus, searchLocalMail, readLocalMailThread } from '@x/core/dist/knowledge/email/local-mail.js';
+import { localFirstRpcHandlers } from '@x/server';
 import { workspace as workspaceShared } from '@x/shared';
 import * as mcpCore from '@x/core/dist/mcp/mcp.js';
 import * as runsCore from '@x/core/dist/runtime/legacy/runs.js';
@@ -402,13 +400,12 @@ export function registerIpcHandlers(handlers: InvokeHandlers) {
     // Strangler-fig: channels migrated to rowboat-server cross localhost HTTP
     // instead of calling their in-process handler (which stays in the map as
     // the ROWBOAT_FORWARD_MIGRATED=0 kill switch).
-    const forwarded = shouldForwardChannel(channel);
     ipcMain.handle(channel, async (event, rawArgs) => {
       // Validate request payload
       const args = ipc.validateRequest(channel, rawArgs);
 
       // Call handler (or the migrated channel's HTTP twin)
-      const result = forwarded ? await forwardRpc(channel, args) : await handler(event, args);
+      const result = shouldForwardChannel(channel) ? await forwardRpc(channel, args) : await handler(event, args);
 
       // Validate response payload
       return ipc.validateResponse(channel, result);
@@ -858,16 +855,13 @@ export function setupIpcHandlers() {
   void warmSentContacts();
 
   registerIpcHandlers({
-    'localMail:status': async () => localMailStatus(),
-    'localMail:search': async (_event, args) => searchLocalMail(args),
-    'localMail:read': async (_event, args) => readLocalMailThread(args.thread),
-    'tools:inventory': async (_event, args) => getToolInventory(args.includeMcp),
-    'search:getSettings': async () => getSearchSettings(),
-    'search:saveSettings': async (_event, args) => saveSearchSettings(args),
-    'search:test': async (_event, args) => {
-      const result = await searchWeb({ query: 'web search', numResults: 1, provider: args.provider });
-      return result.success ? { success: true, count: result.count } : result;
-    },
+    'localMail:status': async () => localFirstRpcHandlers['localMail:status'](),
+    'localMail:search': async (_event, args) => localFirstRpcHandlers['localMail:search'](args),
+    'localMail:read': async (_event, args) => localFirstRpcHandlers['localMail:read'](args),
+    'tools:inventory': async (_event, args) => localFirstRpcHandlers['tools:inventory'](args),
+    'search:getSettings': async () => localFirstRpcHandlers['search:getSettings'](),
+    'search:saveSettings': async (_event, args) => localFirstRpcHandlers['search:saveSettings'](args),
+    'search:test': async (_event, args) => localFirstRpcHandlers['search:test'](args),
     'app:getVersions': async () => {
       // args is null for this channel (no request payload)
       return getVersions();

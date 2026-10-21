@@ -14,6 +14,7 @@ import { createRpcRoutes } from './router.js';
 import { createWorkspaceRoutes } from './workspace-route.js';
 import { createWsHub, type WsHub, type PushChannel } from './ws-hub.js';
 import { setCapabilityTransport } from './capabilities.js';
+import { buildPairingPayload } from './pairing.js';
 
 // Assembles the transport: HTTP router + workspace files + WS event hub on
 // one node:http server. Deliberately does NOT boot @x/core — the host (today
@@ -146,6 +147,11 @@ export async function createRowboatServer(opts: RowboatServerOptions): Promise<R
 
   app.route('/', createRpcRoutes(opts.handlers));
   app.route('/', createWorkspaceRoutes(opts.resolveWorkspacePath));
+  app.get('/pairing', c => {
+    const payload = buildPairingPayload(boundPort, config.lanEnabled, key);
+    c.header('Cache-Control', 'no-store');
+    return c.json({ running: true, name: payload.name, port: boundPort, lanEnabled: config.lanEnabled, urls: payload.urls, token: key });
+  });
 
   const httpServer = createAdaptorServer({ fetch: app.fetch }) as HttpServer;
 

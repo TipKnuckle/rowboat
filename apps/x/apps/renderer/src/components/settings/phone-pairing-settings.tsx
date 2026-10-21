@@ -9,6 +9,7 @@ import { toast } from "sonner"
 
 type PairingInfo = {
   running: boolean
+  remote?: boolean
   name: string
   port: number | null
   lanEnabled: boolean
@@ -78,7 +79,7 @@ export function PhonePairingSettings({ dialogOpen }: { dialogOpen: boolean }) {
   // The exact JSON the phone app expects in the QR (see @x/server pairing.ts).
   const token = info.token
   const qrPayload = JSON.stringify({ v: 1, name: info.name, urls: info.urls, token })
-  const primaryUrl = info.urls[info.lanEnabled ? 1 : 0] ?? info.urls[0]
+  const primaryUrl = info.urls[!info.remote && info.lanEnabled ? 1 : 0] ?? info.urls[0]
 
   const copy = (label: string, value: string) => {
     void navigator.clipboard.writeText(value)
@@ -87,7 +88,7 @@ export function PhonePairingSettings({ dialogOpen }: { dialogOpen: boolean }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2.5">
+      {info.remote ? <p className="text-sm text-muted-foreground">Pair directly with {info.name}. Network access and key rotation are managed on that server.</p> : <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2.5">
         <div className="min-w-0">
           <div className="text-sm font-medium">Allow connections from your network</div>
           <div className="text-xs text-muted-foreground mt-0.5">
@@ -97,9 +98,9 @@ export function PhonePairingSettings({ dialogOpen }: { dialogOpen: boolean }) {
           </div>
         </div>
         <Switch checked={info.lanEnabled} onCheckedChange={handleLanToggle} disabled={toggling} />
-      </div>
+      </div>}
 
-      {info.lanEnabled ? (
+      {info.remote || info.lanEnabled ? (
         <div className="space-y-3">
           <div>
             <h4 className="text-sm font-medium">Pair your phone</h4>
@@ -137,7 +138,7 @@ export function PhonePairingSettings({ dialogOpen }: { dialogOpen: boolean }) {
         </div>
       </div>
 
-      <div className="space-y-2">
+      {!info.remote && <div className="space-y-2">
         <h4 className="text-sm font-medium">Reset pairing</h4>
         <p className="text-xs text-muted-foreground">
           Creates a new pairing code. Every paired phone is disconnected and has to
@@ -152,7 +153,7 @@ export function PhonePairingSettings({ dialogOpen }: { dialogOpen: boolean }) {
         >
           {rotating ? "Resetting…" : "Reset pairing code"}
         </Button>
-      </div>
+      </div>}
     </div>
   )
 }

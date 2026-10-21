@@ -123,6 +123,8 @@ export function RemoteServerSettings({ dialogOpen }: { dialogOpen: boolean }) {
         />
         <Input
           placeholder="Access code"
+          type="password"
+          autoComplete="off"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           className="font-mono text-xs"

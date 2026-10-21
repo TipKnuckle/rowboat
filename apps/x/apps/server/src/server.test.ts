@@ -104,6 +104,13 @@ describe('rowboat-server transport', () => {
       workDir,
       handlers: stubHandlers({
         'sessions:list': async () => ({ sessions: [] }),
+        'search:getSettings': async () => ({ provider: 'tavily', configured: { exa: false, tavily: true, firecrawl: false }, rowboatAvailable: false, available: true }),
+        'search:saveSettings': async args => ({ provider: args.provider, configured: { exa: false, tavily: true, firecrawl: false }, rowboatAvailable: false, available: true }),
+        'search:test': async () => ({ success: true, count: 1 }),
+        'tools:inventory': async () => ({ tools: [], notices: ['server inventory'] }),
+        'localMail:status': async () => ({ available: true, path: '/server/Mail', count: 10 }),
+        'localMail:search': async () => [],
+        'localMail:read': async () => [],
       }),
       events,
       resolveWorkspacePath: (rel) => {
@@ -138,6 +145,33 @@ describe('rowboat-server transport', () => {
   it('rejects rpc without a bearer token', async () => {
     const res = await fetch(`${base}/rpc/sessions:list`, { method: 'POST' });
     expect(res.status).toBe(401);
+  });
+
+  it('serves pairing metadata only to authenticated clients', async () => {
+    expect((await fetch(`${base}/pairing`)).status).toBe(401);
+    const response = await fetch(`${base}/pairing`, authed());
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({ running: true, port: server.port, token: server.key, urls: [`http://127.0.0.1:${server.port}`] });
+  });
+
+  it.each([
+    ['search:getSettings', null],
+    ['search:saveSettings', { provider: 'tavily', keys: { tavily: 'test-key' } }],
+    ['search:test', { provider: 'tavily' }],
+    ['tools:inventory', { includeMcp: false }],
+    ['localMail:status', null],
+    ['localMail:search', { query: 'tag:inbox' }],
+    ['localMail:read', { thread: '0000000000000001' }],
+  ])('exposes %s through authenticated server RPC', async (channel, args) => {
+    const request = { method: 'POST', body: JSON.stringify(args) };
+    expect((await fetch(`${base}/rpc/${channel}`, request)).status).toBe(401);
+    expect((await fetch(`${base}/rpc/${channel}`, authed(request))).status).toBe(200);
+  });
+
+  it('validates migrated search and mail requests before invoking handlers', async () => {
+    for (const [channel, args] of [['search:saveSettings', { provider: 'unknown' }], ['localMail:read', { thread: '--help' }]]) {
+      expect((await fetch(`${base}/rpc/${channel}`, authed({ method: 'POST', body: JSON.stringify(args) }))).status).toBe(400);
+    }
   });
 
   it('rejects a wrong bearer token', async () => {
