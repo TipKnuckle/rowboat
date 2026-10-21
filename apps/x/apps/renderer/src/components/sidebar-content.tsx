@@ -897,6 +897,7 @@ export function SidebarContentPanel({
   // email address ("gagan.p@…" → "Gagan"). The account API has no name.
   const accountName = firstName(gmailName) || nameFromEmail(userEmail) || (isRowboatConnected ? 'Rowboat' : 'Not signed in')
   const accountInitial = accountName === 'Not signed in' ? '?' : accountName.charAt(0).toUpperCase()
+  const showAccountIdentity = accountName !== 'Not signed in' || sidebarPreferences.signIn
   // The pill beside the name: Upgrade on a trial or a free plan, otherwise
   // Manage; red once credits run out.
   const pillLabel = outOfCredits || billing?.subscriptionStatus === 'trialing' ? 'Upgrade' : upgradeLabel
@@ -1264,12 +1265,12 @@ export function SidebarContentPanel({
               <div className="sb-account-group">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" className="sb-account" aria-label={`${accountName}: account and settings`}>
-                    <span className="sb-avatar" aria-hidden="true">
+                  <button type="button" className="sb-account" aria-label={showAccountIdentity ? `${accountName}: account and settings` : 'Settings'}>
+                    {showAccountIdentity ? <span className="sb-avatar" aria-hidden="true">
                       {accountInitial}
                       {(outOfCredits || hasOauthError) && <span className={cn('sb-avatar-flag', outOfCredits && 'is-alert')} />}
-                    </span>
-                    <span className="sb-account-name">{accountName}</span>
+                    </span> : <Settings className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                    <span className="sb-account-name">{showAccountIdentity ? accountName : 'Settings'}</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -1278,13 +1279,13 @@ export function SidebarContentPanel({
                   sideOffset={8}
                   className="sb-menu w-[248px] rounded-xl p-1.5"
                 >
-                  <div className="flex items-center gap-2.5 px-2 pb-2 pt-1.5">
+                  {showAccountIdentity && <div className="flex items-center gap-2.5 px-2 pb-2 pt-1.5">
                     <span className="sb-avatar size-8! text-[13px]!" aria-hidden="true">{accountInitial}</span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-semibold">{accountName}</div>
                       <div className="truncate text-[11.5px] text-muted-foreground">{userEmail ?? 'Not signed in'}</div>
                     </div>
-                  </div>
+                  </div>}
                   {isRowboatConnected ? (
                     billing && (
                       <div className="mb-1 flex items-center gap-3 rounded-lg bg-foreground/[0.04] px-2.5 py-2">
