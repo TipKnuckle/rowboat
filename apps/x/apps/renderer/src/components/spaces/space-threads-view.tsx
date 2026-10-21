@@ -14,6 +14,10 @@ import { threadBadge, useReadStateVersion } from '@/lib/spaces-read-state'
 import { threadLabelOf } from '@/lib/spaces-conventions'
 import { formatFeedTime, resolveMentions } from '@/lib/spaces-presentation'
 import { toast } from '@/lib/toast'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { FilterTabs, SpacesEmpty, SpacesPage } from '@/components/spaces/page-shell'
 
 /**
  * The Threads view (2026-10-15, "threads" discussion in Main): every thread
@@ -72,7 +76,7 @@ export function SpaceThreadsView({ orgId, orgAddress, spaceId, direct, selfMembe
     presence: SpacePresence
     onOpen: (rootMessageId: string) => void
 }) {
-    const { member } = useSpaceAccess()
+    const { writable } = useSpaceAccess()
     useReadStateVersion()
     const [filter, setFilter] = useState<ThreadsFilter>('all')
     const [archived, setArchived] = useState(false)
@@ -80,6 +84,7 @@ export function SpaceThreadsView({ orgId, orgAddress, spaceId, direct, selfMembe
     const [pending, setPending] = useState<string | null>(null)
     const showArchived = filter === 'named' && archived
     const rows = useMemo(() => threadRows(topics, roots, filter, showArchived, selfMemberId), [topics, roots, filter, showArchived, selfMemberId])
+    const archivedCount = topics.filter((topic) => topic.archived).length
     const manage = async (id: string, action: spaces.SpacesManageTopicAction) => {
         setPending(id)
         try {
@@ -90,79 +95,85 @@ export function SpaceThreadsView({ orgId, orgAddress, spaceId, direct, selfMembe
             toast(error instanceof Error ? error.message : 'Could not update the discussion', 'error')
         } finally { setPending(null) }
     }
-    const empty = !loaded ? 'Loading threads…'
-        : showArchived ? 'No archived discussions.'
-        : filter === 'named' ? 'No named threads. Make a thread a discussion to give it a title and a place here.'
-        : filter === 'mine' ? 'No threads started by you yet.'
-        : 'No threads yet. Reply to a message to start one.'
-    return <section aria-label="Threads" className="flex min-h-0 flex-1 flex-col">
-        <div className="spaces-pane-header flex shrink-0 items-center gap-3 border-b border-border">
-            <h2 className="text-[13px] font-semibold">Threads</h2>
-            <div role="group" aria-label="Show threads" className="flex flex-1 items-center gap-1">
-                <button type="button" aria-pressed={filter === 'all'} className="spaces-collection-filter" onClick={() => setFilter('all')}>All</button>
-                <button type="button" aria-pressed={filter === 'named'} className="spaces-collection-filter" onClick={() => setFilter('named')}>Named</button>
-                <button type="button" aria-pressed={filter === 'mine'} className="spaces-collection-filter" onClick={() => setFilter('mine')}>By me</button>
-            </div>
-            {filter === 'named' && <>
-                <button type="button" aria-pressed={!archived} className="spaces-collection-filter" onClick={() => setArchived(false)}>Active</button>
-                <button type="button" aria-pressed={archived} className="spaces-collection-filter" onClick={() => setArchived(true)}>Archived</button>
-            </>}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+    return <SpacesPage label="Threads" title="Threads" count={rows.length}
+        subtitle="Every conversation in this space. Named threads have a title so the team can find them again."
+        toolbar={<>
+            <FilterTabs label="Show threads" value={filter} onChange={setFilter}
+                options={[{ value: 'all', label: 'All' }, { value: 'named', label: 'Named' }, { value: 'mine', label: 'By me' }]} />
+            {filter === 'named' && <FilterTabs label="Show" value={archived ? 'archived' : 'active'} onChange={(value) => setArchived(value === 'archived')}
+                options={[{ value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived', count: archivedCount }]} />}
+        </>}>
+        <ul className="flex flex-col gap-0.5">
             {rows.map(({ rootMessageId, topic, root, activityAt }) => {
                 const title = resolveMentions(topic?.title ?? threadLabelOf(root?.body ?? ''), memberNames, spaceNames)
                 const author = root ? memberNames.get(root.author.memberId) ?? null : null
                 const badge = threadBadge(orgId, spaceId, rootMessageId, direct)
+                const replies = root?.replyCount ?? 0
+                const working = (presence.working.get(rootMessageId)?.length ?? 0) > 0
                 const copyLink = () => void copySpacesLink(messageUrl(orgAddress, spaceId, rootMessageId))
                 const Icon = topic ? MessagesSquare : MessageSquare
-                return <ContextMenu key={rootMessageId}>
+                return <li key={rootMessageId}><ContextMenu>
                     <ContextMenuTrigger asChild>
-                        <div className="group flex items-center gap-2 border-b border-border/60 py-1">
-                            {topic && renaming?.id === topic.id ? <form className="flex min-w-0 flex-1 gap-2 py-2" onSubmit={(event) => {
+                        <div className="group relative flex items-center rounded-xl transition-colors hover:bg-accent/60 has-[[data-state=open]]:bg-accent/60">
+                            {topic && renaming?.id === topic.id ? <form className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5" onSubmit={(event) => {
                                 event.preventDefault()
                                 if (renaming.title.trim()) void manage(topic.id, { action: 'retitle', title: renaming.title.trim() })
                             }}>
-                                <input autoFocus aria-label="Discussion title" className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                                <Input autoFocus aria-label="Discussion title" className="h-9 min-w-0 flex-1 text-sm"
                                     value={renaming.title} onChange={(event) => setRenaming({ id: topic.id, title: event.target.value })}
                                     onKeyDown={(event) => { if (event.key === 'Escape') setRenaming(null) }} />
-                                <button type="submit" className="spaces-collection-filter" disabled={pending === topic.id || !renaming.title.trim()}>Save</button>
-                                <button type="button" className="spaces-collection-filter" onClick={() => setRenaming(null)}>Cancel</button>
-                            </form> : <button type="button" className="flex min-w-0 flex-1 items-center gap-3 rounded py-3 text-left hover:bg-accent/50"
+                                <Button type="submit" size="sm" disabled={pending === topic.id || !renaming.title.trim()}>Save</Button>
+                                <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
+                            </form> : <button type="button" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-3 pr-12 text-left"
                                 onMouseEnter={() => prefetchThread(orgId, spaceId, rootMessageId)} onClick={() => onOpen(rootMessageId)}>
-                                <Icon className="size-4 shrink-0 text-muted-foreground" />
-                                <span className="min-w-0 flex-1"><span className={`block truncate text-[13px] ${badge.unread > 0 ? 'font-semibold' : ''}`}>{title}</span>{' '}
-                                    <span className="mt-1 block truncate text-xs text-muted-foreground">{author ? `${author} · ` : ''}{root?.replyCount ?? 0} replies · {formatFeedTime(activityAt)}</span></span>
-                                {(presence.working.get(rootMessageId)?.length ?? 0) > 0 && <Bot className="size-3.5 shrink-0 text-muted-foreground" aria-label="A Rowboat is working here" />}
+                                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                    <Icon className="size-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className={cn('block truncate text-sm', badge.unread > 0 ? 'font-semibold text-foreground' : 'font-medium')}>{title}</span>{' '}
+                                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <span className="truncate">{author ? `${author} · ` : ''}{replies} {replies === 1 ? 'reply' : 'replies'} · {formatFeedTime(activityAt)}</span>
+                                        {working && <span className="inline-flex shrink-0 items-center gap-1 text-[var(--stream-link)]"><Bot className="size-3.5" aria-hidden /> Rowboat is working</span>}
+                                    </span>
+                                </span>
                                 <UnreadBadge badge={badge} direct={direct} />
                             </button>}
-                            <DropdownMenu>
+                            {!(topic && renaming?.id === topic.id) && <DropdownMenu>
                                 <DropdownMenuTrigger asChild><button type="button" aria-label={`Options for ${title}`} disabled={!!topic && pending === topic.id}
-                                    className="flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent"><MoreHorizontal className="size-4" /></button></DropdownMenuTrigger>
+                                    className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-background hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"><MoreHorizontal className="size-4" /></button></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onSelect={copyLink}><LinkIcon className="mr-2 size-3.5" />Copy link</DropdownMenuItem>
                                     {topic && <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem disabled={!member} onSelect={() => setRenaming({ id: topic.id, title })}><Pencil className="mr-2 size-3.5" />Rename</DropdownMenuItem>
-                                        <DropdownMenuItem disabled={!member} onSelect={() => void manage(topic.id, { action: topic.archived ? 'unarchive' : 'archive' })}>
+                                        <DropdownMenuItem disabled={!writable} onSelect={() => setRenaming({ id: topic.id, title })}><Pencil className="mr-2 size-3.5" />Rename</DropdownMenuItem>
+                                        <DropdownMenuItem disabled={!writable} onSelect={() => void manage(topic.id, { action: topic.archived ? 'unarchive' : 'archive' })}>
                                             {topic.archived ? <ArchiveRestore className="mr-2 size-3.5" /> : <Archive className="mr-2 size-3.5" />}{topic.archived ? 'Unarchive' : 'Archive'}
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem disabled={!member} onSelect={() => void manage(topic.id, { action: 'remove' })}><MessageSquareOff className="mr-2 size-3.5" />Convert back to thread</DropdownMenuItem>
+                                        <DropdownMenuItem disabled={!writable} onSelect={() => void manage(topic.id, { action: 'remove' })}><MessageSquareOff className="mr-2 size-3.5" />Convert back to thread</DropdownMenuItem>
                                     </>}
                                 </DropdownMenuContent>
-                            </DropdownMenu>
+                            </DropdownMenu>}
                         </div>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
                         <ContextMenuItem onSelect={() => onOpen(rootMessageId)}><Icon className="mr-2 size-3.5" />Open thread</ContextMenuItem>
                         <ContextMenuItem onSelect={copyLink}><LinkIcon className="mr-2 size-3.5" />Copy link</ContextMenuItem>
                     </ContextMenuContent>
-                </ContextMenu>
+                </ContextMenu></li>
             })}
-            {rows.length === 0 && <p className="py-8 text-sm text-muted-foreground">{empty}</p>}
-            {filter !== 'named' && hasMore && <button type="button" className="spaces-collection-filter mt-3" disabled={loadingOlder} onClick={onLoadOlder}>
-                {loadingOlder ? 'Loading…' : 'Load older threads'}
-            </button>}
-        </div>
-    </section>
+        </ul>
+        {rows.length === 0 && (!loaded
+            ? <p className="px-3 py-12 text-sm text-muted-foreground">Loading threads…</p>
+            : showArchived
+                ? <SpacesEmpty icon={<Archive />} title="No archived discussions">Archived discussions stay readable here.</SpacesEmpty>
+                : filter === 'named'
+                    ? <SpacesEmpty icon={<MessagesSquare />} title="No named threads yet">Give a thread a title from its ⋯ menu, or type /discussion in a reply, and it shows up here.</SpacesEmpty>
+                    : filter === 'mine'
+                        ? <SpacesEmpty icon={<MessageSquare />} title="No threads started by you">Threads whose first message you posted show up here.</SpacesEmpty>
+                        : <SpacesEmpty icon={<MessageSquare />} title="No threads yet">Reply to a message to start a thread.</SpacesEmpty>)}
+        {filter !== 'named' && hasMore && <Button type="button" size="sm" variant="ghost" className="mt-3" disabled={loadingOlder} onClick={onLoadOlder}>
+            {loadingOlder ? 'Loading…' : 'Load older threads'}
+        </Button>}
+    </SpacesPage>
 }

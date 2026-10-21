@@ -38,6 +38,8 @@ export const Member = z.object({
   id: MemberId,
   /** Display-only, org-scoped, not unique. Attribution keys on `id`, never on names. */
   displayName: z.string().min(1).max(128),
+  /** What they do, as the roster shows it (spec §4 Member profile; built 2026-10-19). Absent = none. */
+  title: z.string().min(1).max(128).optional(),
   avatarUrl: z.string().url().optional(),
   role: MemberRole.default('member'),
   /** Absent from servers before 2026-09-29, whose members are all people. */
@@ -69,8 +71,40 @@ export const Member = z.object({
    * refuses them as a sign-in, a DM, or an addition. Absent = active.
    */
   deactivatedAt: z.string().optional(),
+  /**
+   * When an admin removed the member from the org (spec §4 Roles, built
+   * 2026-10-19): the member's state is `removed`. Like a deactivated
+   * account, the row stays so their messages keep their author, and clients
+   * mark them and leave them out of pickers. Unlike it, an invite accepted
+   * by the same identity reactivates the row and clears this. Absent = active.
+   */
+  removedAt: z.string().optional(),
 });
 export type Member = z.infer<typeof Member>;
+
+/**
+ * Who may create invites (spec §4 Invites and Roles, built 2026-10-19): any
+ * member, Slack's default, or admins only. An admin sets it.
+ */
+export const InvitePolicy = z.enum(['members', 'admins']);
+export type InvitePolicy = z.infer<typeof InvitePolicy>;
+
+/** The org's settings any member may read and an admin sets (2026-10-19). */
+export const OrgSettings = z.object({
+  invitePolicy: InvitePolicy.default('members'),
+});
+export type OrgSettings = z.infer<typeof OrgSettings>;
+
+/**
+ * Edit your own profile (spec §4 Member profile; built 2026-10-19): a field
+ * left out is left alone. Both are trimmed; a name must keep a character, and
+ * an empty title clears it. The avatar has its own byte route.
+ */
+export const UpdateProfile = z.object({
+  displayName: z.string().max(128).optional(),
+  title: z.string().max(128).optional(),
+});
+export type UpdateProfile = z.infer<typeof UpdateProfile>;
 
 /**
  * The (kind, connection) pairs Harbor accepts when an agent is added (spec §4
@@ -206,6 +240,13 @@ export const Space = z.object({
    * payloads and every existing space are live. A DM is never archived.
    */
   archived: z.boolean().default(false),
+  /**
+   * A default space (spec §5 answer 3, built 2026-10-19): everyone who
+   * accepts an invite to the org joins it. Only a shared open space can be
+   * one, and only an admin sets it. Old payloads and every existing space
+   * are not defaults.
+   */
+  isDefault: z.boolean().default(false),
 });
 export type Space = z.infer<typeof Space>;
 

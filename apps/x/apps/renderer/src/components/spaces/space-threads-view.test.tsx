@@ -53,7 +53,7 @@ describe('threads view', () => {
         expect(screen.getByText('Launch', { exact: true })).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'By me' }))
         expect(screen.getAllByRole('button', { name: / replies/ }).map((row) => row.textContent)).toEqual([expect.stringMatching(/^Fix the login bug/)])
-        expect(screen.queryByRole('button', { name: 'Archived' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /^Archived/ })).not.toBeInTheDocument()
     })
     it('pages older threads from the stream', () => {
         const onLoadOlder = vi.fn()
@@ -68,7 +68,7 @@ describe('threads view', () => {
         expect(screen.queryByText('Old launch')).not.toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /^Launch 0 replies/ }))
         expect(onOpen).toHaveBeenCalledWith('root-live')
-        fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Archived/ }))
         expect(screen.queryByText('Launch', { exact: true })).not.toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /^Old launch 0 replies/ }))
         expect(onOpen).toHaveBeenLastCalledWith('root-archived')
