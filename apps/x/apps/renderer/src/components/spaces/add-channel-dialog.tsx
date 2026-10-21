@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { OrgWithSpaces } from '@/hooks/use-spaces'
-import * as analytics from '@/lib/analytics'
 import { toast } from '@/lib/toast'
 
 /**
@@ -26,7 +25,6 @@ export function AddChannelDialog({ org, open, onOpenChange, onCreated }: {
         setBusy(true)
         try {
             const { space } = await window.ipc.invoke('spaces:createSpace', { orgId: org.id, name: trimmed })
-            analytics.spacesSpaceCreated()
             setName('')
             onOpenChange(false)
             onCreated(space.id)

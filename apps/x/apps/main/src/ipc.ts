@@ -63,7 +63,6 @@ import { getPairingInfo, rotateKey as rotateServerKey, setLanEnabled as setServe
 import { testModelConnection, listModelsForProvider, generateOneShot } from '@x/core/dist/models/models.js';
 import { getImageModelCatalog, getModelCatalog } from '@x/core/dist/models/catalog.js';
 import { checkRecommendationUpdate, markRecommendationSeen, resolveRecommendationUpdate } from '@x/core/dist/models/recommendation-update.js';
-import { captureProviderConnected, captureProviderDisconnected } from '@x/core/dist/analytics/model-providers.js';
 import { getDefaultModelAndProvider } from '@x/core/dist/models/defaults.js';
 import { isSignedIn } from '@x/core/dist/account/account.js';
 import type { IModelConfigRepo } from '@x/core/dist/models/repo.js';
@@ -125,7 +124,6 @@ import { findSpaceMessage } from '@x/core/dist/typesafe/find_message.js';
 import * as appsIndexer from '@x/core/dist/apps/indexer.js';
 import * as appsServer from '@x/core/dist/apps/server.js';
 import * as appsAgents from '@x/core/dist/apps/agents.js';
-import { capture, isTelemetryOptedOut, setTelemetryOptedOut } from '@x/core/dist/analytics/posthog.js';
 import { recordAppVersion, isVersionUpgrade } from '@x/core/dist/config/app_version.js';
 import { getUpdaterStatus, checkForUpdates, quitAndInstallUpdate } from './updater.js';
 import { setSpacesDockBadge } from './dock-badge.js';
@@ -166,7 +164,6 @@ import { searchContacts as searchGmailContacts, warmContactIndex } from '@x/core
 import { getGoogleDocsConnectionStatus, importGoogleDoc, syncGoogleDocDown, syncGoogleDocUp, getGoogleDocLink } from '@x/core/dist/knowledge/google_docs.js';
 import { startManagedGooglePick } from '@x/core/dist/knowledge/google-picker-managed.js';
 import { liveNoteBus } from '@x/core/dist/knowledge/live-note/bus.js';
-import { getInstallationId } from '@x/core/dist/analytics/installation.js';
 import { API_URL } from '@x/core/dist/config/env.js';
 import {
   fetchLiveNote,
@@ -877,8 +874,6 @@ export function setupIpcHandlers() {
       // Downgrades still restamp (so the next upgrade reports correctly) but
       // don't toast "Updated to vX" or count as a client update.
       const updatedFrom = changedFrom && isVersionUpgrade(changedFrom, version) ? changedFrom : null;
-      // 'app_updated' is taken by the in-app apps feature; this is the client itself.
-      if (updatedFrom) capture('client_updated', { from: updatedFrom, to: version });
       return { version, updatedFrom };
     },
     'app:setSpacesDockBadge': async (_event, args) => {
@@ -911,14 +906,6 @@ export function setupIpcHandlers() {
         // first-run default over it.
         saveAppSettings({ loginItemRegistered: true });
       }
-      return { success: true as const };
-    },
-    // Anonymous product telemetry opt-out (2026-10-13, #415).
-    'app:getTelemetrySettings': async () => {
-      return { optOut: isTelemetryOptedOut() };
-    },
-    'app:setTelemetrySettings': async (_event, args) => {
-      setTelemetryOptedOut(args.optOut);
       return { success: true as const };
     },
     'meeting:setRecordingState': async (_event, args) => {
@@ -1163,18 +1150,8 @@ export function setupIpcHandlers() {
       return { payload: getMeetingPopupPayload() };
     },
     'meetingDetect:action': async (_event, args) => {
-      // Captured here because the popup window runs without PostHog.
-      capture('meeting_popup_action', { action: args.action });
       handleMeetingPopupAction(args.action);
       return {};
-    },
-    'analytics:bootstrap': async () => {
-      return {
-        installationId: getInstallationId(),
-        apiUrl: API_URL,
-        appVersion: app.getVersion(),
-        telemetryOptOut: isTelemetryOptedOut(),
-      };
     },
     'workspace:getRoot': async () => {
       return workspace.getRoot();
@@ -1708,7 +1685,6 @@ export function setupIpcHandlers() {
         // Model lists gate on sign-in state (composer picker, models:list) —
         // push the change so they refresh without polling.
         chatgptStatusBus.publish({ signedIn: true });
-        captureProviderConnected('codex');
       }
       return result;
     },
@@ -1720,7 +1696,6 @@ export function setupIpcHandlers() {
       try {
         await signOutChatGPT();
         chatgptStatusBus.publish({ signedIn: false });
-        captureProviderDisconnected('codex');
         return { success: true };
       } catch (error) {
         console.error('[ChatGPTAuth] Sign-out failed:', error);
@@ -1829,7 +1804,6 @@ export function setupIpcHandlers() {
     'codeSession:create': async (_event, args) => {
       const service = container.resolve<CodeSessionService>('codeSessionService');
       const session = await service.create(args);
-      capture('code_session_created', { agent: session.agent });
       return { session };
     },
     'codeSession:list': async () => {
@@ -2252,7 +2226,6 @@ export function setupIpcHandlers() {
     },
     'apps:create': async (_event, args) => {
       const app = await appsIndexer.createApp(args);
-      capture('app_created', { folder: app.folder });
       void maybeActivateCredit('first_app_built');
       return { app };
     },
@@ -2261,7 +2234,6 @@ export function setupIpcHandlers() {
       // Remove app-owned bg-tasks too — orphaned app--<folder>-- tasks firing
       // against a deleted app was a painful prototype failure mode.
       await appsAgents.deleteAppAgents(args.folder);
-      capture('app_deleted', { folder: args.folder });
       return { ok: true as const };
     },
     'apps:setTheme': async (_event, args) => {
@@ -2285,7 +2257,6 @@ export function setupIpcHandlers() {
     },
     'apps:star': async (_event, args) => {
       const result = await appsStars.setStar(args.repo, args.star);
-      capture('app_starred', { repo: args.repo, star: args.star });
       return result;
     },
     'apps:catalogDetail': async (_event, args) => {
@@ -2321,7 +2292,6 @@ export function setupIpcHandlers() {
       // Materialize bundled agents NOW, not on the next apps:list poll — the
       // renderer's post-install enable dialog patches these tasks immediately.
       if (result.app) await appsAgents.syncAppAgents(result.app);
-      capture('app_installed', { name: args.name });
       return result;
     },
     'apps:installFromUrl': async (_event, args) => {
@@ -2330,12 +2300,10 @@ export function setupIpcHandlers() {
       }
       const result = await appsInstaller.confirmUrlInstall(args.url);
       if (result.app) await appsAgents.syncAppAgents(result.app);
-      capture('app_installed', { name: result.app.manifest?.name ?? result.app.folder });
       return result;
     },
     'apps:uninstall': async (_event, args) => {
       await appsInstaller.uninstallApp(args.folder);
-      capture('app_uninstalled', { folder: args.folder });
       return { ok: true as const };
     },
     'apps:checkUpdate': async (_event, args) => {
@@ -2347,12 +2315,10 @@ export function setupIpcHandlers() {
         confirmOverwriteModified: args.confirmOverwriteModified,
         confirmNewCapabilities: args.confirmNewCapabilities,
       });
-      capture('app_updated', { from: before, to: app.manifest?.version });
       return { app };
     },
     'apps:rollback': async (_event, args) => {
       const app = await appsInstaller.rollbackApp(args.folder);
-      capture('app_rolled_back', { folder: args.folder });
       return { app };
     },
     'apps:publish': async (event, args) => {
@@ -2360,12 +2326,10 @@ export function setupIpcHandlers() {
       const result = await appsPublisher.publishApp(args.folder, (step, detail) => {
         win?.webContents.send('apps:progress', { folder: args.folder, step, detail });
       });
-      capture('app_published', { firstPublish: true });
       return result;
     },
     'apps:publishUpdate': async (_event, args) => {
       const result = await appsPublisher.publishUpdate(args.folder, args.increment);
-      capture('app_published', { version: result.version, firstPublish: false });
       return result;
     },
     'apps:registerExisting': async (_event, args) => {

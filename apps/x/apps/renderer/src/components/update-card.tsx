@@ -3,7 +3,6 @@ import { X } from "lucide-react"
 import { Streamdown } from "@/components/streamdown"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { updatePrompted } from "@/lib/analytics"
 import type { ipc as ipcShared } from "@x/shared"
 
 type UpdaterStatus = ipcShared.IPCChannels["updater:status"]["req"]
@@ -47,7 +46,6 @@ export function UpdateCard() {
 
   useEffect(() => {
     if (visible && promptedForRef.current !== versionKey) {
-      updatePrompted()
       promptedForRef.current = versionKey
     }
   }, [visible, versionKey])

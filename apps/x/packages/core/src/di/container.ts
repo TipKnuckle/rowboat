@@ -41,8 +41,7 @@ import type { IContextResolver } from "../runtime/turns/context-resolver.js";
 import { createContextResolver } from "../runtime/turns/context-elision.js";
 import { EmitterTurnLifecycleBus, type ITurnLifecycleBus } from "../runtime/turns/bus.js";
 import { TurnEventHub, type ITurnEventBus } from "../runtime/turns/event-hub.js";
-import { RealUsageReporter } from "../runtime/turns/bridges/real-usage-reporter.js";
-import type { IUsageReporter } from "../runtime/turns/usage-reporter.js";
+import { NoopUsageReporter, type IUsageReporter } from "../runtime/turns/usage-reporter.js";
 import { TurnRuntime } from "../runtime/turns/runtime.js";
 import type { ITurnRuntime } from "../runtime/turns/api.js";
 import type { IAgentResolver } from "../runtime/turns/agent-resolver.js";
@@ -141,7 +140,7 @@ container.register({
     // sessionId and durable file offsets, regardless of who started the turn.
     turnEventBus: asClass<ITurnEventBus>(TurnEventHub).singleton(),
     usageReporter: asFunction<IUsageReporter>(
-        () => new RealUsageReporter(),
+        () => new NoopUsageReporter(),
     ).singleton(),
     agentResolver: asFunction<IAgentResolver>(
         () =>

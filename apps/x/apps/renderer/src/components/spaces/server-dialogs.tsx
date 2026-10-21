@@ -7,7 +7,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { refreshSpacesAccountState, refreshSpacesOrgs, useSpacesAccountState } from '@/hooks/use-spaces'
 import { consumeServerDialog, subscribeServerDialog, type ServerDialogRequest } from '@/lib/server-dialog'
 import { toast } from '@/lib/toast'
-import * as analytics from '@/lib/analytics'
 import { LOCAL_RUNTIME } from '@/lib/feature-flags'
 import { listNames } from '@/lib/spaces-invites'
 
@@ -176,7 +175,6 @@ function CreateServerDialog({ onClose, onDone, onJoinInstead }: {
         setBusy('create')
         try {
             const { org } = await window.ipc.invoke('spaces:createOrg', { name: name.trim() })
-            analytics.spacesServerCreated()
             toast(`Created ${org.name} — you're the admin`, 'success')
             onDone(org.id)
         } catch (err) {
@@ -299,7 +297,6 @@ function JoinServerDialog({ inviteUrl: initialUrl, autoJoin = false, onClose, on
         setBusy(true)
         try {
             const { org, space } = await window.ipc.invoke('spaces:joinInvite', { url: target.trim() })
-            analytics.spacesSpaceJoined('invite_link')
             toast(space ? `Joined ${space.name} on ${org.name}` : `Joined ${org.name}`, 'success')
             onDone(org.id, space?.id)
         } catch (err) {
@@ -400,7 +397,6 @@ function AddressServerDialog({ onClose, onDone, onBack }: { onClose: () => void;
         setBusy(true)
         try {
             const { org } = await window.ipc.invoke('spaces:addOrgByAddress', { address: address.trim() })
-            analytics.spacesSpaceJoined('server_address')
             toast(`Signed into ${org.name}`, 'success')
             onDone(org.id)
         } catch (err) {
@@ -450,7 +446,6 @@ function DevServerDialog({ onClose, onDone, onBack }: { onClose: () => void; onD
         setBusy(true)
         try {
             const { org } = await window.ipc.invoke('spaces:addOrg', { baseUrl: baseUrl.trim(), memberId: memberId.trim() })
-            analytics.spacesSpaceJoined('dev_server')
             toast(`Signed into ${org.name} as ${org.memberId}`, 'success')
             onDone(org.id)
         } catch (err) {

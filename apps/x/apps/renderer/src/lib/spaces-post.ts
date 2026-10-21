@@ -6,8 +6,6 @@ import { buildPendingMessage, failPendingStreamMessage, ingestStreamMessage, res
 import { markStreamRead } from '@/lib/spaces-read-state'
 import { maybeInvokeRowboat, type RowboatTurnOptions } from '@/lib/spaces-rowboat'
 import { threadLabelOf } from '@/lib/spaces-conventions'
-import { containsRowboatAddress } from '@/lib/spaces-mentions'
-import * as analytics from '@/lib/analytics'
 import { noteInvocations } from '@/hooks/use-space-invocations'
 
 /** Options picked in the composer for agent members a message mentions, by agent id (Harbor spec §8, 2026-09-30). */
@@ -35,7 +33,6 @@ export function postStreamMessage(org: OrgWithSpaces, space: spaces.Space, body:
             noteInvocations(org.id, space.id, result.invocations)
             // The org read the stream up to our own post; mirror it.
             markStreamRead(org.id, space.id, result.message.offset, { sync: false })
-            analytics.spacesMessagePosted({ kind: 'general', mentionsRowboat: containsRowboatAddress(body) })
             // @rowboat on a fresh stream message: the agent works the thread
             // under it, its receipt lands as the first reply.
             maybeInvokeRowboat(org, space, { rootMessageId: result.message.id, label: threadLabelOf(body) }, result.message.id, body, agent)

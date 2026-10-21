@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../analytics/posthog.js', () => ({ capture: vi.fn() }));
 import { buildInvocationMessage, mentionOrigin, threadOrigin } from './topic-agent.js';
 
 const input = {

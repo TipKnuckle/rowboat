@@ -3,8 +3,6 @@ import { IModelConfigRepo } from "./repo.js";
 import { listGatewayModels } from "./gateway.js";
 import { getRowboatConfig } from "../config/rowboat.js";
 import { selectInitialModel, selectInitialTaskModels } from "./initial-selection.js";
-import { normalizeModelRecommendation } from "@x/shared/dist/rowboat-account.js";
-import { capture } from "../analytics/posthog.js";
 import { markRecommendationSeen } from "./recommendation-update.js";
 
 /**
@@ -63,15 +61,6 @@ async function seedAssistantModel(repo: IModelConfigRepo, cfg: Config | null): P
             // The user has now been offered this version of the
             // recommendation; the update prompt waits for the next one.
             await markRecommendationSeen("rowboat");
-            // Measures recommendation quality: hit = the backend's pick was
-            // in the gateway list; miss = first-listed fallback.
-            capture("llm_initial_model_selected", {
-                flavor: "rowboat",
-                model: choice.model,
-                recommended: choice.model === normalizeModelRecommendation(recommendations, "rowboat")?.assistantModel.model,
-                task_overrides_seeded: Object.keys(taskModels).length,
-                source: "sign_in",
-            });
         }
     } catch (error) {
         // Best-effort: a failed initial selection must never break sign-in.

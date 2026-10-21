@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import * as analytics from "@/lib/analytics"
 import { ArrowLeft, CheckCircle2, Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,7 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { providerDisplayNames, type ModelRef } from "@/components/model-selector"
 import { selectInitialModel, selectInitialTaskModels } from "@x/shared/dist/initial-selection.js"
-import { normalizeModelRecommendation, type ModelRecommendations } from "@x/shared/dist/rowboat-account.js"
+import type { ModelRecommendations } from "@x/shared/dist/rowboat-account.js"
 import { useModels } from "@/hooks/use-models"
 import { useRowboatConfig } from "@/hooks/use-rowboat-config"
 import { useChatGPT } from "@/hooks/useChatGPT"
@@ -228,7 +227,6 @@ export function ProvidersSection({ dialogOpen, variant = "settings" }: {
         onChatGPTSignIn={chatgpt.signIn}
         hadAssistant={selections.assistantModel !== null}
         modelRecommendations={modelRecommendations}
-        analyticsSource={variant === "onboarding" ? "onboarding" : "connect"}
       />
 
       {manageCard && (
@@ -253,7 +251,7 @@ type AddStep =
   | { kind: "result"; name: string; first: boolean; pickedModel: string | null; modelCount: number | null }
   | { kind: "error"; flavor: ByokFlavor; message: string }
 
-function AddProviderDialog({ open, onOpenChange, connectedIds, isRowboatConnected, chatgptSignedIn, onChatGPTSignIn, hadAssistant, modelRecommendations, analyticsSource }: {
+function AddProviderDialog({ open, onOpenChange, connectedIds, isRowboatConnected, chatgptSignedIn, onChatGPTSignIn, hadAssistant, modelRecommendations }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   connectedIds: string[]
@@ -262,7 +260,6 @@ function AddProviderDialog({ open, onOpenChange, connectedIds, isRowboatConnecte
   onChatGPTSignIn: () => Promise<unknown> | void
   hadAssistant: boolean
   modelRecommendations: ModelRecommendations | undefined
-  analyticsSource: 'connect' | 'onboarding'
 }) {
   const [step, setStep] = useState<AddStep>({ kind: "choose" })
   const [apiKey, setApiKey] = useState("")
@@ -405,13 +402,6 @@ function AddProviderDialog({ open, onOpenChange, connectedIds, isRowboatConnecte
             ...(choice?.effort ? { effort: choice.effort } : {}),
           },
           ...(Object.keys(taskModels).length > 0 ? { taskModels } : {}),
-        })
-        analytics.llmInitialModelSelected({
-          flavor,
-          model,
-          recommended: model === normalizeModelRecommendation(modelRecommendations, flavor)?.assistantModel.model,
-          taskOverridesSeeded: Object.keys(taskModels).length,
-          source: analyticsSource,
         })
         // The user has now been offered this version of the recommendation:
         // the update prompt waits for the next one. Awaited BEFORE the

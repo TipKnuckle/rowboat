@@ -7,12 +7,12 @@ vi.mock("../auth/tokens.js", () => ({
 
 import { authedFetch, listGatewayImageModels } from "./gateway.js";
 
-describe("Rowboat gateway request attribution", () => {
+describe("Rowboat gateway authentication without telemetry", () => {
     afterEach(() => {
         vi.unstubAllGlobals();
     });
 
-    it("sends the complete turn-scoped analytics context", async () => {
+    it("sends authentication without transmitting local turn attribution", async () => {
         const fetchMock = vi.fn(
             async (
                 input: Parameters<typeof fetch>[0],
@@ -36,11 +36,8 @@ describe("Rowboat gateway request attribution", () => {
 
         const [, init] = fetchMock.mock.calls[0];
         const headers = new Headers(init?.headers);
-        expect(Object.fromEntries(headers.entries())).toMatchObject({
+        expect(Object.fromEntries(headers.entries())).toEqual({
             authorization: "Bearer access-token",
-            "x-rowboat-use-case": "background_task_agent",
-            "x-rowboat-sub-use-case": "cron",
-            "x-rowboat-agent-name": "background-task-agent",
         });
     });
 });

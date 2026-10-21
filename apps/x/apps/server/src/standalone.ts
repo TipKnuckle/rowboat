@@ -1,6 +1,4 @@
 import process from 'node:process';
-import { identifyIfSignedIn } from '@x/core/dist/analytics/identify.js';
-import { shutdown as shutdownAnalytics } from '@x/core/dist/analytics/posthog.js';
 import { WorkDir } from '@x/core/dist/config/config.js';
 import { initConfigs } from '@x/core/dist/config/initConfigs.js';
 import container, {
@@ -33,9 +31,6 @@ async function main(): Promise<void> {
   // The workdir lock is acquired by createRowboatServer itself — a live
   // Electron-hosted transport makes this boot fail loudly, as it must.
   await initConfigs();
-  // Core analytics lives in this process. Restore identity on cold starts;
-  // sign-in/out changes are already handled by core's OAuth flows.
-  void identifyIfSignedIn();
   // Client capabilities route over the WS as reverse calls (RFC Q14): the
   // connected client that advertises each capability performs it.
   const broker = capabilityBroker();
@@ -114,7 +109,6 @@ async function main(): Promise<void> {
     try {
       await server.close();
     } finally {
-      await shutdownAnalytics();
       process.exit(0);
     }
   };

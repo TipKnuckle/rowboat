@@ -4,7 +4,6 @@ import { listCodexModels } from "./codex.js";
 import { getRowboatConfig } from "../config/rowboat.js";
 import { selectInitialModel, selectInitialTaskModels } from "./initial-selection.js";
 import { normalizeModelRecommendation } from "@x/shared/dist/rowboat-account.js";
-import { capture } from "../analytics/posthog.js";
 
 /**
  * Model-selection hooks for the ChatGPT-subscription (codex) sign-in
@@ -38,13 +37,6 @@ export async function applyCodexInitialSelection(): Promise<void> {
                     ...(choice.effort ? { effort: choice.effort } : {}),
                 },
                 ...(Object.keys(taskModels).length > 0 ? { taskModels } : {}),
-            });
-            capture("llm_initial_model_selected", {
-                flavor: "codex",
-                model: choice.model,
-                recommended: choice.model === normalizeModelRecommendation(recommendations, "codex")?.assistantModel.model,
-                task_overrides_seeded: Object.keys(taskModels).length,
-                source: "sign_in",
             });
         }
     } catch (error) {

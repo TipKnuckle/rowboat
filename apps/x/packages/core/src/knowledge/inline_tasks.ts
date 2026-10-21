@@ -8,7 +8,6 @@ import { asRunModelOptions, getKgModel, resolveProviderConfig } from '../models/
 import { directCallReasoningOptions } from '../models/reasoning.js';
 import { createLanguageModel } from '../models/models.js';
 import { inlineTask } from '@x/shared';
-import { captureLlmUsage } from '../analytics/usage.js';
 import { withUseCase } from '../analytics/use_case.js';
 
 const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds
@@ -661,14 +660,6 @@ Respond with ONLY valid JSON: either a schedule object or null. No other text.`;
             prompt: instruction,
             ...reasoning,
         }));
-
-        captureLlmUsage({
-            useCase: 'knowledge_sync',
-            subUseCase: 'inline_task_classify',
-            model: selection.model,
-            provider: selection.provider,
-            usage: result.usage,
-        });
 
         let text = result.text.trim();
         console.log('[classifySchedule] LLM response:', text);

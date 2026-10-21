@@ -2,10 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { PostHogProvider } from 'posthog-js/react'
-import type { CaptureResult } from 'posthog-js'
 import { ThemeProvider } from '@/contexts/theme-context'
-import { configureAnalyticsContext } from './lib/analytics'
 import { MeetingDetectedPopup } from '@/components/meeting-detected-popup'
 import { QuickAskBar } from '@/components/quick-ask-bar'
 import { ScreenPointerOverlay } from '@/components/screen-pointer-overlay'
@@ -27,9 +24,6 @@ if (import.meta.env.DEV) {
   }, 10_000)
 }
 
-// Fetch the stable installation ID from main so renderer + main share one
-// PostHog distinct_id. Falls back to PostHog's auto-generated anonymous ID
-// if the IPC call fails (rare — main is always up before renderer).
 async function bootstrap() {
   try {
     const connection = await window.ipc.invoke('server:getConnection', null)
@@ -38,61 +32,18 @@ async function bootstrap() {
     console.error('[Workspace] Failed to identify backend:', err)
     setAssistantPreferenceBackend('unknown-backend')
   }
-  let installationId: string | undefined
-  let apiUrl: string | undefined
-  let appVersion: string | undefined
-  let telemetryOptOut = false
-  try {
-    const result = await window.ipc.invoke('analytics:bootstrap', null)
-    installationId = result.installationId
-    apiUrl = result.apiUrl
-    appVersion = result.appVersion
-    telemetryOptOut = Boolean(result.telemetryOptOut)
-  } catch (err) {
-    console.error('[Analytics] Failed to bootstrap from main:', err)
-  }
-
-  configureAnalyticsContext({ apiUrl, appVersion })
-
-  const options = {
-    api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
-    defaults: '2025-11-30' as const,
-    opt_out_capturing_by_default: telemetryOptOut,
-    ...(installationId ? { bootstrap: { distinctID: installationId } } : {}),
-    before_send: (event: CaptureResult | null) => {
-      if (telemetryOptOut) return null
-      if (!event) return event
-      if (appVersion) {
-        event.properties = {
-          ...event.properties,
-          app_version: appVersion,
-        }
-      }
-      return event
-    },
-    loaded: (posthogInstance?: { opt_out_capturing?: () => void }) => {
-      if (telemetryOptOut && posthogInstance?.opt_out_capturing) {
-        posthogInstance.opt_out_capturing()
-      }
-      configureAnalyticsContext({ apiUrl, appVersion })
-    },
-  }
-
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <PostHogProvider apiKey={telemetryOptOut ? '' : (import.meta.env.VITE_PUBLIC_POSTHOG_KEY ?? '')} options={options}>
         <ThemeProvider defaultTheme="system">
           <App />
         </ThemeProvider>
-      </PostHogProvider>
     </StrictMode>,
   )
 
-  // The loaded callback applies api_url/app_version once PostHog has initialized.
 }
 
 // Utility windows load the same bundle with a hash route and render only
-// their own UI — no analytics or app bootstrap needed.
+// their own UI — no app bootstrap needed.
 if (window.location.hash === '#meeting-detected') {
   // "Meeting detected — Take Notes?" popup window; same pattern.
   createRoot(document.getElementById('root')!).render(

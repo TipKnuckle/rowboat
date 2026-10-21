@@ -15,8 +15,6 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { sessions as sessionsShared } from '@x/shared';
 import type { DrawerNavigationProp } from 'expo-router/drawer';
-
-import * as analytics from '@/lib/analytics';
 import { ModelPill } from '@/components/model-picker';
 import { TurnView } from '@/components/turn-view';
 import { useConnection } from '@/lib/connection';
@@ -149,7 +147,6 @@ export default function ChatScreen() {
           ...(model ? { overrides: { model: { provider: model.provider, model: model.model } } } : {}),
         },
       });
-      analytics.mobileMessageSent();
       if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await refresh();
     } catch (err) {

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../analytics/posthog.js', () => ({ capture: vi.fn() }));
 import type { TurnBusEvent } from '@x/shared/dist/turns.js';
 import { MAX_LINKS, SpaceResponseIndexer, linkKey, postedMessageId, type ResponseLinkStore } from './response-index.js';
 

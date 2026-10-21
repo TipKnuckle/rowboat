@@ -53,12 +53,6 @@ vi.mock('@/lib/spaces-saved', () => ({ toggleSaved: vi.fn(), useSaved: () => [] 
 vi.mock('@/lib/spaces-rowboat', () => ({ maybeInvokeRowboat: vi.fn() }))
 vi.mock('@/lib/spaces-response-chat', () => ({ openResponseChat: vi.fn() }))
 vi.mock('@/lib/toast', () => ({ toast: vi.fn() }))
-vi.mock('@/lib/analytics', () => ({
-    spacesInviteLinkCopied: vi.fn(),
-    spacesMessagePosted: vi.fn(),
-    spacesReactionToggled: vi.fn(),
-    spacesMessageDeleted: vi.fn(),
-}))
 
 import { GeneralStream } from './general-stream'
 import { jumpToLatest, loadNewerStreamMessages, loadStreamAround } from '@/hooks/use-space-chat'

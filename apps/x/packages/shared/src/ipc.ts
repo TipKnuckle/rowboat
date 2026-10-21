@@ -193,15 +193,6 @@ export const ipcSchemas = {
       electron: z.string(),
     }),
   },
-  'analytics:bootstrap': {
-    req: z.null(),
-    res: z.object({
-      installationId: z.string(),
-      apiUrl: z.string(),
-      appVersion: z.string(),
-      telemetryOptOut: z.boolean().optional(),
-    }),
-  },
   'workspace:getRoot': {
     req: z.null(),
     res: z.object({
@@ -1385,21 +1376,6 @@ export const ipcSchemas = {
   'app:setLoginItemSettings': {
     req: z.object({
       openAtLogin: z.boolean(),
-    }),
-    res: z.object({
-      success: z.literal(true),
-    }),
-  },
-  // Anonymous product telemetry opt-out (2026-10-13, #415).
-  'app:getTelemetrySettings': {
-    req: z.null(),
-    res: z.object({
-      optOut: z.boolean(),
-    }),
-  },
-  'app:setTelemetrySettings': {
-    req: z.object({
-      optOut: z.boolean(),
     }),
     res: z.object({
       success: z.literal(true),

@@ -3,7 +3,6 @@ import { deck } from '@x/shared';
 import { createLanguageModel } from '../models/models.js';
 import { getDefaultModelAndProvider, resolveProviderConfig } from '../models/defaults.js';
 import { directCallReasoningOptions } from '../models/reasoning.js';
-import { captureLlmUsage } from '../analytics/usage.js';
 import { withUseCase } from '../analytics/use_case.js';
 
 // One-shot deck outline generation: user prompt in, zod-validated outline
@@ -153,13 +152,6 @@ export async function generateDeckOutline(input: GenerateDeckOutlineInput): Prom
             prompt,
             ...reasoning,
         }));
-        captureLlmUsage({
-            useCase: 'app_llm_generate',
-            subUseCase: 'deck_outline',
-            model: selection.model,
-            provider: selection.provider,
-            usage: result.usage,
-        });
         return result.text;
     };
 
@@ -275,13 +267,6 @@ export async function generateSlide(input: deck.GenerateSlideRequest): Promise<d
             prompt,
             ...reasoning,
         }));
-        captureLlmUsage({
-            useCase: 'app_llm_generate',
-            subUseCase: 'deck_slide',
-            model: selection.model,
-            provider: selection.provider,
-            usage: result.usage,
-        });
         return result.text;
     };
 
@@ -365,13 +350,6 @@ export async function editSlide(input: deck.EditSlideRequest): Promise<deck.Deck
             prompt,
             ...reasoning,
         }));
-        captureLlmUsage({
-            useCase: 'app_llm_generate',
-            subUseCase: 'deck_slide_edit',
-            model: selection.model,
-            provider: selection.provider,
-            usage: result.usage,
-        });
         return result.text;
     };
 
@@ -470,13 +448,6 @@ export async function reviewDeck(input: deck.ReviewDeckRequest): Promise<deck.De
             prompt,
             ...reasoning,
         }));
-        captureLlmUsage({
-            useCase: 'app_llm_generate',
-            subUseCase: 'deck_review',
-            model: selection.model,
-            provider: selection.provider,
-            usage: result.usage,
-        });
         return result.text;
     };
 

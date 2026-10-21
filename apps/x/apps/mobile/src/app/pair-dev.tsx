@@ -1,8 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-
-import * as analytics from '@/lib/analytics';
 import { probeUrls, useConnection } from '@/lib/connection';
 
 // Dev-only: pair via deep link, for simulators with no camera to scan the QR.
@@ -30,7 +28,6 @@ export default function PairDevScreen() {
         return;
       }
       await pair({ url: healthy, token });
-      analytics.mobilePaired('dev-link');
       router.replace('/chat');
     })();
   }, [url, token, pair]);

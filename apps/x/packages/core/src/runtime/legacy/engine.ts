@@ -27,7 +27,6 @@ import { IRunsRepo } from "./repo.js";
 import { IRunsLock } from "./lock.js";
 import { IAbortRegistry } from "../turns/abort-registry.js";
 import { PrefixLogger } from "@x/shared";
-import { captureLlmUsage } from "../../analytics/usage.js";
 import { enterUseCase, withUseCase, type UseCase } from "../../analytics/use_case.js";
 import { classifyToolPermissions, type AutoPermissionCandidate } from "../../security/auto-permission-classifier.js";
 
@@ -1227,16 +1226,6 @@ async function* streamLlm(
                 };
                 break;
             case "finish-step":
-                if (analytics) {
-                    captureLlmUsage({
-                        useCase: analytics.useCase,
-                        ...(analytics.subUseCase ? { subUseCase: analytics.subUseCase } : {}),
-                        ...(analytics.agentName ? { agentName: analytics.agentName } : {}),
-                        model: analytics.modelId,
-                        provider: analytics.providerName,
-                        usage: event.usage,
-                    });
-                }
                 yield {
                     type: "finish-step",
                     usage: event.usage,

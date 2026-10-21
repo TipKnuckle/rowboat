@@ -34,9 +34,6 @@ import { shutdown as shutdownAppsServer } from "@x/core/dist/apps/server.js";
 import { registerAppsHostApi } from "@x/core/dist/apps/host-api.js";
 import { setTokenCipher as setGithubTokenCipher } from "@x/core/dist/apps/github-auth.js";
 import { setTokenCipher as setChatGPTTokenCipher } from "@x/core/dist/auth/chatgpt-auth.js";
-import { shutdown as shutdownAnalytics } from "@x/core/dist/analytics/posthog.js";
-import { identifyIfSignedIn } from "@x/core/dist/analytics/identify.js";
-import { syncModelProviderPersonProperties } from "@x/core/dist/analytics/model-providers.js";
 
 import { initConfigs } from "@x/core/dist/config/initConfigs.js";
 import { WorkDir } from "@x/core/dist/config/config.js";
@@ -618,18 +615,6 @@ app.whenReady().then(async () => {
   // leave any existing cache in use and never block boot.
   startModelsDevRefresh();
 
-  // PostHog identify() is idempotent — call it on every startup so existing
-  // signed-in installs (and every cold start of v0.3.4+) get re-identified.
-  // Otherwise main-process events stay anonymous until the user re-signs-in.
-  identifyIfSignedIn().catch((error) => {
-    console.error('[Analytics] Failed to identify on startup:', error);
-  });
-  // Baseline the provider person properties (llm_provider_flavors et al) on
-  // every launch — existing installs get them without any provider action.
-  syncModelProviderPersonProperties().catch((error) => {
-    console.error('[Analytics] Failed to sync provider properties:', error);
-  });
-
   // Interactive sign-in flows run in core now (client-server separation,
   // Phase 3b) — the browser they open is a client capability.
   registerUrlOpener({
@@ -895,8 +880,5 @@ stopSkillsWatcher();
   });
   stopServerHost().catch((error) => {
     console.error('[server-host] Failed to shut down cleanly:', error);
-  });
-  shutdownAnalytics().catch((error) => {
-    console.error('[Analytics] Failed to flush on quit:', error);
   });
 });

@@ -91,8 +91,7 @@ TTS dropdown are all retired — a per-message "read aloud" action on assistant
 messages is the planned replacement for text-in/voice-out.
 
 The call button is disabled unless both voice input (Deepgram) and voice
-output (TTS) are configured. `call_started` (with `preset`) is captured in
-PostHog — the adoption metric for this feature.
+output (TTS) are configured.
 
 **Popout mechanics**: the floating pill is the COMPANION WINDOW (the same
 always-on-top window ⌥⇧Space summons) in its pill layout — camera tile when
@@ -404,8 +403,7 @@ speak the highlights → open-item when the user picks one.
 ## Latency
 
 Voice-to-voice latency (user stops talking → assistant audio) is engineered
-at four points; the `call_turn_latency` PostHog event measures the real
-distribution (utterance → submit → first speak → audio playing):
+at four points:
 
 - **Push-to-talk endpoint** (`useVoiceMode.ts` `pttEnd`): the key release
   IS the endpoint — no silence detection at all. Submit latency after
@@ -476,5 +474,4 @@ screen frame per message unless the screen changed.
   picker yet).
 - The full-screen call covers the chat; there's no in-call transcript drawer.
 - The "attach camera frames to typed chat without a call" combination (the
-  old video+chat mode) was cut in the call-model simplification; if analytics
-  show demand, it should return as an attachment chip, not a mode.
+  old video+chat mode) was cut in the call-model simplification.

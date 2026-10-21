@@ -48,8 +48,6 @@ import { toggleSaved, useSaved } from '@/lib/spaces-saved'
 import { maybeInvokeRowboat } from '@/lib/spaces-rowboat'
 import { openResponseChat } from '@/lib/spaces-response-chat'
 import { toast } from '@/lib/toast'
-import * as analytics from '@/lib/analytics'
-import { containsRowboatAddress } from '@/lib/spaces-mentions'
 
 // One flat thread (annotation model): the root on top, the artifacts it
 // produced, the replies, a reply composer. A Discussion is the same pane with
@@ -643,7 +641,6 @@ export function ThreadPane({
                 })
                 // Replying follows the thread and reads it up to our reply (the org's rule); mirror it.
                 noteThread(org.id, space.id, rootMessageId, { following: true, readOffset: result.message.offset, lastReplyOffset: result.message.offset })
-                analytics.spacesMessagePosted({ kind: 'topic', mentionsRowboat: containsRowboatAddress(body) })
                 maybeInvokeRowboat(org, space, { rootMessageId, label: threadLabel }, result.message.id, body, agent)
             })
             .catch(() => {
@@ -674,7 +671,6 @@ export function ThreadPane({
             const result = await invokeSpace('spaces:postMessage', { orgId: org.id, spaceId: space.id, threadRoot: rootMessageId, body })
             echo(result.message)
             noteThread(org.id, space.id, rootMessageId, { following: true, readOffset: result.message.offset, lastReplyOffset: result.message.offset })
-            analytics.spacesFoldRequested()
             maybeInvokeRowboat(org, space, { rootMessageId, label: threadLabel }, result.message.id, body)
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not ask Rowboat', 'error')
@@ -698,7 +694,6 @@ export function ThreadPane({
             })
             if (updated.id === root?.id) setRoot(updated)
             else setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
-            analytics.spacesReactionToggled({ action })
         } catch (err) {
             if (message.id === root?.id) setRoot(message)
             else setMessages((prev) => prev.map((m) => (m.id === message.id ? message : m)))
@@ -735,7 +730,6 @@ export function ThreadPane({
             const { message: posted } = await postPoll({ orgId: org.id, spaceId: space.id, rootMessageId, input })
             echo(posted)
             noteThread(org.id, space.id, rootMessageId, { following: true, readOffset: posted.offset, lastReplyOffset: posted.offset })
-            analytics.spacesMessagePosted({ kind: 'topic', mentionsRowboat: false })
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not post the poll', 'error')
             throw err
@@ -826,7 +820,6 @@ export function ThreadPane({
                 orgId: org.id, spaceId: space.id, messageId: message.id,
             })
             setMessages((prev) => prev.map((m) => (m.id === deleted.id ? deleted : m)))
-            analytics.spacesMessageDeleted()
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not delete', 'error')
         }
@@ -858,7 +851,6 @@ export function ThreadPane({
             const res = await invokeSpace('spaces:createTopic', { orgId: org.id, spaceId: space.id, rootMessageId, title: trimmed })
             setTopic(res.topic)
             ingestTopic(org.id, space.id, res.topic)
-            analytics.spacesTopicStarted()
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not create the discussion', 'error')
         }
@@ -1422,7 +1414,6 @@ export function ThreadPane({
                             try {
                                 const result = await invokeSpace('spaces:createInvite', { orgId: org.id, spaceIds: [space.id] })
                                 await navigator.clipboard.writeText(result.link)
-                                analytics.spacesInviteLinkCopied()
                                 toast('Invite link copied to clipboard', 'success')
                             } catch (err) {
                                 toast(err instanceof Error ? err.message : 'Could not create an invite', 'error')

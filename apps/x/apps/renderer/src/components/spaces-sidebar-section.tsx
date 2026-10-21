@@ -25,7 +25,6 @@ import { canInvite, useOrgSettings } from '@/hooks/use-org-settings'
 import { isSpaceExpanded, setSpaceExpanded, useSpaceExpansionVersion } from '@/lib/spaces-expansion'
 import type { RailSelection } from '@/lib/spaces-selection'
 import { toast } from '@/lib/toast'
-import * as analytics from '@/lib/analytics'
 import { openServerDialog } from '@/lib/server-dialog'
 import { isGroupChat, serverLandingSpaceId } from '@/lib/spaces-navigation'
 import { AddServerDialog } from '@/components/spaces/add-server-dialog'
@@ -170,7 +169,6 @@ function OrgRows({ org, activeSpace, unread, onOpenSpace, onOpenActivity, onOpen
             if (space.visibility !== visibility) toast('The server created this space as private. Update the server to create open spaces.', 'info')
             invalidateSpaceDirectory(org.id)
             setVisibility('private')
-            analytics.spacesSpaceCreated()
             setCreating(false)
             setNewName('')
             onChanged()

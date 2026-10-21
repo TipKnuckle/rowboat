@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import posthog from 'posthog-js'
 import {
   Bell,
   Bot,
@@ -22,7 +21,6 @@ import {
   Waypoints,
   type LucideIcon,
 } from 'lucide-react'
-import * as analytics from '@/lib/analytics'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { projectLabel, useCodeSessions } from '@/components/code/use-code-sessions'
@@ -256,7 +254,6 @@ export function CommandPalette({ open, onOpenChange, chats, notes, defaultScope,
   }
   useEffect(() => {
     if (!open) return
-    analytics.searchOpened()
     inputRef.current?.focus()
   }, [open])
 
@@ -585,8 +582,6 @@ export function CommandPalette({ open, onOpenChange, chats, notes, defaultScope,
         ? searchAllSpaces(targets, text, { perSpace: scope === 'all' ? 3 : 5, limit: scope === 'all' ? 6 : 15 })
           .then((r) => { if (seq.current === mine) setSpaceHits(r) })
         : Promise.resolve(setSpaceHits(EMPTY_CROSS_SPACE))
-      analytics.searchExecuted([...types, ...(wantSpaces ? ['spaces'] : [])])
-      posthog.people.set_once({ has_used_search: true })
       void Promise.allSettled([local, remote]).then(() => {
         if (seq.current === mine) setSearching(false)
       })
@@ -696,7 +691,6 @@ export function CommandPalette({ open, onOpenChange, chats, notes, defaultScope,
   // Picking a row closes the palette and goes there — in that order, so the
   // destination's own focus and dialogs are not fighting a closing one.
   const select = useCallback((row: Row) => {
-    analytics.searchResultSelected(row.kind)
     onOpenChange(false)
     onNavigate(row.dest)
   }, [onOpenChange, onNavigate])

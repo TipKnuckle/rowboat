@@ -32,12 +32,10 @@ function emitOAuthEvent(event: OAuthConnectEvent): void {
   oauthConnectBus.publish(event);
 }
 import { getBillingInfo } from '../billing/billing.js';
-import { capture as analyticsCapture, identify as analyticsIdentify, reset as analyticsReset } from '../analytics/posthog.js';
 import { isSignedIn } from '../account/account.js';
 import { getWebappUrl } from '../config/remote-config.js';
 import { claimTokensViaBackend } from '../auth/google-backend-oauth.js';
 import { applyRowboatInitialSelection, clearRowboatSelections } from '../models/rowboat-selection.js';
-import { captureProviderConnected, captureProviderDisconnected } from '../analytics/model-providers.js';
 
 function buildRedirectUri(port: number): string {
   return `http://localhost:${port}/oauth/callback`;
@@ -264,19 +262,9 @@ async function afterRowboatSignIn(): Promise<string | undefined> {
   // saved yet, pick the initial one (recommendation if the gateway lists it,
   // else first listed). Never replaces a saved choice; best-effort by design.
   await applyRowboatInitialSelection();
-  captureProviderConnected('rowboat');
   try {
     const billing = await getBillingInfo();
     if (billing.userId) {
-      analyticsIdentify(billing.userId, {
-        ...(billing.userEmail ? { email: billing.userEmail } : {}),
-        plan: billing.subscriptionPlanId,
-        status: billing.subscriptionStatus,
-      });
-      analyticsCapture('user_signed_in', {
-        plan: billing.subscriptionPlanId,
-        status: billing.subscriptionStatus,
-      });
       return billing.userId;
     }
   } catch (meError) {
@@ -707,13 +695,10 @@ export async function disconnectProvider(provider: string): Promise<{ success: b
 
     await oauthRepo.delete(provider);
     if (provider === 'rowboat') {
-      analyticsCapture('user_signed_out');
-      analyticsReset();
       // Signing out disconnects the rowboat provider: drop the model
       // selections that reference it (same dangling-ref cleanup as removing
       // any provider). The composer prompts for a new pick.
       await clearRowboatSelections();
-      captureProviderDisconnected('rowboat');
     }
     // Email caches hold provider-specific thread/message/draft ids — wipe them
     // so a later connect (same or other provider) starts clean. The gmail_sync/

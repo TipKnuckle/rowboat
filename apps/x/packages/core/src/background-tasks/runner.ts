@@ -5,7 +5,6 @@ import { getBackgroundTaskAgentModel } from '../models/defaults.js';
 import { startHeadlessAgent, startWhenPossible } from '../runtime/assembly/headless-app.js';
 import { buildTriggerBlock } from '../runtime/assembly/build-trigger-block.js';
 import { backgroundTaskBus } from './bus.js';
-import { capture } from '../analytics/posthog.js';
 
 const log = new PrefixLogger('BgTask:Agent');
 
@@ -269,7 +268,6 @@ export async function runBackgroundTask(
         throw err;
     } finally {
         if (analyticsOutcome) {
-            capture(analyticsOutcome.event, analyticsOutcome.properties);
         }
         runningTasks.delete(slug);
     }

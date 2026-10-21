@@ -2,7 +2,6 @@ import type { LanguageModel } from 'ai';
 import { events, PrefixLogger } from '@x/shared';
 import { generateObjectSafe } from '../models/structured.js';
 import type { RowboatEvent } from '@x/shared/dist/events.js';
-import { captureLlmUsage } from '../analytics/usage.js';
 import { withUseCase, type UseCase } from '../analytics/use_case.js';
 import type { EventConsumerTarget } from './consumer.js';
 
@@ -96,13 +95,6 @@ export async function routeBatch(
                 schema: events.Pass1OutputSchema,
                 retry: true,
             }));
-            captureLlmUsage({
-                useCase: opts.useCase,
-                subUseCase: 'routing',
-                model: modelId,
-                provider: providerName,
-                usage: result.usage,
-            });
             for (const id of result.object.ids) {
                 matched.add(id);
             }

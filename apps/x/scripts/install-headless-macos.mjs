@@ -33,8 +33,6 @@ fs.mkdirSync(path.dirname(plist), { recursive: true });
 const configPath = path.join(workDir, 'config/server.json');
 const existing = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {};
 fs.writeFileSync(configPath, JSON.stringify({ ...existing, lanEnabled: true, port: 3220 }, null, 2) + '\n', { mode: 0o600 });
-const settingsPath = path.join(workDir, 'config/app_settings.json');
-if (!fs.existsSync(settingsPath)) fs.writeFileSync(settingsPath, JSON.stringify({ telemetryOptOut: true }), { mode: 0o600 });
 
 const definition = {
   Label: service,

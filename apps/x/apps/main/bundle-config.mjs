@@ -1,8 +1,6 @@
 // Shared by both desktop processes: installed apps do not inherit CI's env.
 export function desktopBundleDefines(appVersion) {
   return {
-    'process.env.POSTHOG_KEY': JSON.stringify(process.env.VITE_PUBLIC_POSTHOG_KEY ?? ''),
-    'process.env.POSTHOG_HOST': JSON.stringify(process.env.VITE_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com'),
     'process.env.ROWBOAT_APP_VERSION': JSON.stringify(appVersion ?? ''),
   };
 }

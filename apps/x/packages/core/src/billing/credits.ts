@@ -4,7 +4,6 @@ import { WorkDir } from '../config/config.js';
 import { getAccessToken } from '../auth/tokens.js';
 import { decodeJwtPayload } from '../auth/jwt.js';
 import { isSignedIn } from '../account/account.js';
-import { isFeatureEnabled } from '../analytics/posthog.js';
 import { API_URL } from '../config/env.js';
 import { getBillingInfo } from './billing.js';
 import { getRowboatConfig } from '../config/rowboat.js';
@@ -33,30 +32,13 @@ async function getActivityCatalog(): Promise<KnownCatalogEntry[]> {
 
 const CLAIMED_FILE = path.join(WorkDir, 'config', 'credit_activations.json');
 
-const CREDITS_FLAG_KEY = 'credit-rewards';
-const FLAG_CACHE_TTL_MS = 5 * 60 * 1000;
-
-let flagCache: { value: boolean; fetchedAt: number } | null = null;
-
-/**
- * Whether the credit-rewards feature is on for this user. Defaults ON; the
- * PostHog `credit-rewards` flag is a remote kill switch / rollout control —
- * create it and set release conditions to turn the feature off (or ramp it)
- * for non-matching users. Evaluated against the identified rowboat user and
- * cached briefly so reward triggers don't add a network hop. ROWBOAT_CREDITS
- * env var (1/0) overrides everything for development.
- */
+// 2026-10-21: retain the existing default without consulting a tracking service.
 export async function isCreditsEnabled(): Promise<boolean> {
   const override = process.env.ROWBOAT_CREDITS;
   if (override === '1' || override === 'true') return true;
   if (override === '0' || override === 'false') return false;
 
-  if (flagCache && Date.now() - flagCache.fetchedAt < FLAG_CACHE_TTL_MS) {
-    return flagCache.value;
-  }
-  const value = await isFeatureEnabled(CREDITS_FLAG_KEY, true);
-  flagCache = { value, fetchedAt: Date.now() };
-  return value;
+  return true;
 }
 
 const PLAN_CACHE_TTL_MS = 60 * 1000;

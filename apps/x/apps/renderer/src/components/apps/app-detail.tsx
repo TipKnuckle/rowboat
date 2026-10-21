@@ -3,7 +3,6 @@ import { X, RotateCcw, Play, UploadCloud, ArrowUpCircle, Trash2 } from 'lucide-r
 import type { rowboatApp } from '@x/shared'
 import { PublishDialog } from '@/components/apps/publish-dialog'
 import { unpinApp } from '@/lib/pinned-apps'
-import * as analytics from '@/lib/analytics'
 
 // App detail panel (spec §14): manifest info, provenance/publish state,
 // bundled agents with enable toggles, rollback when available. Update/publish
@@ -130,14 +129,12 @@ export function AppDetail({ folder, onClose }: { folder: string; onClose: () => 
     setAgents((prev) => prev.map((a) => (a.slug === slug ? { ...a, active } : a)))
     try {
       await window.ipc.invoke('bg-task:patch', { slug, partial: { active } })
-      analytics.bgAgentToggled(active)
     } catch {
       setReloadNonce((n) => n + 1) // revert to truth on failure
     }
   }
 
   const runAgent = async (slug: string) => {
-    analytics.bgAgentRunClicked()
     try {
       await window.ipc.invoke('bg-task:run', { slug })
     } catch { /* surfaced via bg-task UI */ }

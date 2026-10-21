@@ -17,12 +17,10 @@ const mocks = vi.hoisted(() => ({
     updateConfig: vi.fn<(patch: unknown) => Promise<void>>(async () => {}),
     getRowboatConfig: vi.fn(async (): Promise<unknown> => ({ modelRecommendations: {} })),
     getModelCatalog: vi.fn(async (): Promise<unknown> => ({ providers: [], defaultModel: null })),
-    capture: vi.fn(),
 }));
 
 vi.mock('../config/config.js', () => ({ WorkDir: workDir }));
 vi.mock('../config/rowboat.js', () => ({ getRowboatConfig: mocks.getRowboatConfig }));
-vi.mock('../analytics/posthog.js', () => ({ capture: mocks.capture }));
 vi.mock('./catalog.js', () => ({ getModelCatalog: mocks.getModelCatalog }));
 vi.mock('../di/container.js', () => ({
     default: { resolve: () => ({ getConfig: mocks.getConfig, updateConfig: mocks.updateConfig }) },
@@ -59,7 +57,6 @@ beforeEach(async () => {
     await fs.mkdir(path.dirname(statePath), { recursive: true });
     mocks.getConfig.mockReset();
     mocks.updateConfig.mockReset();
-    mocks.capture.mockReset();
     mocks.getRowboatConfig.mockImplementation(async () => ({ modelRecommendations: RECS }));
     serveConfig({ assistantModel: { provider: 'rowboat', model: 'google/gemini-3.5-flash' } });
     serveCatalog('rowboat', ['Auto', 'Auto-background', 'google/gemini-3.5-flash']);
@@ -81,7 +78,6 @@ describe('checkRecommendationUpdate', () => {
         expect(result.flavor).toBe('rowboat');
         expect(result.providerId).toBe('rowboat');
         expect(result.rows.map((r) => r.slot)).toEqual(['assistantModel', 'knowledgeGraph', 'chatTitle']);
-        expect(mocks.capture).toHaveBeenCalledWith('llm_recommendation_update_shown', expect.objectContaining({ flavor: 'rowboat', row_count: 3 }));
     });
 
     it('resolves a BYOK provider\'s flavor through the providers map', async () => {
@@ -138,9 +134,6 @@ describe('resolveRecommendationUpdate', () => {
             taskModels: { chatTitle: { provider: 'rowboat', model: 'Auto-background' } },
         });
         expect(await readState()).toEqual({ rowboat: shown.hash });
-        expect(mocks.capture).toHaveBeenCalledWith('llm_recommendation_update_applied', expect.objectContaining({
-            applied_slots: ['assistantModel', 'chatTitle'],
-        }));
 
         // The same version is not offered again, even though the unchecked
         // knowledgeGraph slot still differs.
@@ -155,7 +148,6 @@ describe('resolveRecommendationUpdate', () => {
         expect(result.applied).toEqual([]);
         expect(mocks.updateConfig).not.toHaveBeenCalled();
         expect(await readState()).toEqual({ rowboat: shown.hash });
-        expect(mocks.capture).toHaveBeenCalledWith('llm_recommendation_update_dismissed', expect.anything());
         expect(await checkRecommendationUpdate()).toEqual({ shouldShow: false });
     });
 

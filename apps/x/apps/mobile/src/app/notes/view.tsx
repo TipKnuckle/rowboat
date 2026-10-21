@@ -1,8 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text } from 'react-native';
-
-import * as analytics from '@/lib/analytics';
 import { ChatMarkdown } from '@/components/markdown';
 import { useConnection } from '@/lib/connection';
 import { useColors } from '@/theme/colors';
@@ -50,7 +48,6 @@ export default function NoteViewScreen() {
   }, [refresh]);
 
   useEffect(() => {
-    analytics.mobileNoteOpened();
   }, []);
 
   useEffect(() => {

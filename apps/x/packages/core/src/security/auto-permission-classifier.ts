@@ -2,7 +2,6 @@ import type { ModelMessage } from "ai";
 import z from "zod";
 import { ToolPermissionMetadata } from "@x/shared/dist/runs.js";
 import { ToolCallPart } from "@x/shared/dist/message.js";
-import { captureLlmUsage } from "../analytics/usage.js";
 import { withUseCase, type UseCase } from "../analytics/use_case.js";
 import { getAutoPermissionDecisionModel, resolveProviderConfig } from "../models/defaults.js";
 import { createLanguageModel } from "../models/models.js";
@@ -102,14 +101,6 @@ export async function classifyToolPermissions(input: {
             generateOptions: reasoning,
         }),
     );
-
-    captureLlmUsage({
-        useCase: input.useCase,
-        subUseCase: "auto_permission_classifier",
-        model: modelId,
-        provider: providerName,
-        usage: result.usage,
-    });
 
     const allowedIds = new Set(input.candidates.map((candidate) => candidate.toolCall.toolCallId));
     return result.object.decisions.filter((decision) => allowedIds.has(decision.toolCallId));

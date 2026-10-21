@@ -67,7 +67,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { toast } from "@/lib/toast"
-import * as analytics from '@/lib/analytics'
 import { getPinnedApps, onPinnedAppsChanged, unpinApp } from "@/lib/pinned-apps"
 import { useSidebarPreferences } from "@/lib/sidebar-preferences"
 import { isOutOfCredits, CREDIT_EXHAUSTED_EVENT, CREDIT_REPLENISHED_EVENT } from "@/lib/credit-status"
@@ -1820,7 +1819,6 @@ function FlyoutOrgRows({ org, activeSpace, unread, onOpenSpace, onOpenActivity, 
     if (!name) return
     try {
       const { space } = await window.ipc.invoke('spaces:createSpace', { orgId: org.id, name })
-      analytics.spacesSpaceCreated()
       setCreating(false)
       setNewName('')
       onChanged()

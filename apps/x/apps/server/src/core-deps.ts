@@ -103,7 +103,6 @@ import * as composioFlows from '@x/core/dist/composio/flows.js';
 import { signInWithChatGPT, cancelChatGPTSignIn } from '@x/core/dist/auth/chatgpt-signin.js';
 import { signOutChatGPT } from '@x/core/dist/auth/chatgpt-auth.js';
 import { chatgptStatusBus, oauthConnectBus, composioConnectBus } from '@x/core/dist/auth/connector-events.js';
-import { captureProviderConnected, captureProviderDisconnected } from '@x/core/dist/analytics/model-providers.js';
 import { openExternalUrl } from '@x/core/dist/auth/url-opener.js';
 import { startManagedGooglePick } from '@x/core/dist/knowledge/google-picker-managed.js';
 import { testModelConnection, generateOneShot } from '@x/core/dist/models/models.js';
@@ -115,7 +114,6 @@ import * as appsStars from '@x/core/dist/apps/stars.js';
 import * as appsInstaller from '@x/core/dist/apps/installer.js';
 import * as appsPublisher from '@x/core/dist/apps/publisher.js';
 import { registryClient } from '@x/core/dist/apps/registry.js';
-import { capture } from '@x/core/dist/analytics/posthog.js';
 import { triggerRun as triggerAgentScheduleRun } from '@x/core/dist/agent-schedule/runner.js';
 import { search } from '@x/core/dist/search/search.js';
 import { classifySchedule, processRowboatInstruction } from '@x/core/dist/knowledge/inline_tasks.js';
@@ -977,7 +975,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
       const result = await signInWithChatGPT();
       if (result.signedIn) {
         chatgptStatusBus.publish({ signedIn: true });
-        captureProviderConnected('codex');
       }
       return result;
     },
@@ -989,7 +986,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
       try {
         await signOutChatGPT();
         chatgptStatusBus.publish({ signedIn: false });
-        captureProviderDisconnected('codex');
         return { success: true };
       } catch (error) {
         console.error('[ChatGPTAuth] Sign-out failed:', error);
@@ -1134,7 +1130,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
     },
     'apps:create': async (args) => {
       const app = await appsIndexer.createApp(args);
-      capture('app_created', { folder: app.folder });
       void maybeActivateCredit('first_app_built');
       return { app };
     },
@@ -1143,7 +1138,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
       // Remove app-owned bg-tasks too — orphaned app--<folder>-- tasks firing
       // against a deleted app was a painful prototype failure mode.
       await appsAgents.deleteAppAgents(args.folder);
-      capture('app_deleted', { folder: args.folder });
       return { ok: true as const };
     },
     'apps:setTheme': async (args) => {
@@ -1167,7 +1161,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
     },
     'apps:star': async (args) => {
       const result = await appsStars.setStar(args.repo, args.star);
-      capture('app_starred', { repo: args.repo, star: args.star });
       return result;
     },
     'apps:catalogDetail': async (args) => {
@@ -1203,7 +1196,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
       // Materialize bundled agents NOW, not on the next apps:list poll — the
       // renderer's post-install enable dialog patches these tasks immediately.
       if (result.app) await appsAgents.syncAppAgents(result.app);
-      capture('app_installed', { name: args.name });
       return result;
     },
     'apps:installFromUrl': async (args) => {
@@ -1212,12 +1204,10 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
       }
       const result = await appsInstaller.confirmUrlInstall(args.url);
       if (result.app) await appsAgents.syncAppAgents(result.app);
-      capture('app_installed', { name: result.app.manifest?.name ?? result.app.folder });
       return result;
     },
     'apps:uninstall': async (args) => {
       await appsInstaller.uninstallApp(args.folder);
-      capture('app_uninstalled', { folder: args.folder });
       return { ok: true as const };
     },
     'apps:checkUpdate': async (args) => {
@@ -1229,17 +1219,14 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
         confirmOverwriteModified: args.confirmOverwriteModified,
         confirmNewCapabilities: args.confirmNewCapabilities,
       });
-      capture('app_updated', { from: before, to: app.manifest?.version });
       return { app };
     },
     'apps:rollback': async (args) => {
       const app = await appsInstaller.rollbackApp(args.folder);
-      capture('app_rolled_back', { folder: args.folder });
       return { app };
     },
     'apps:publishUpdate': async (args) => {
       const result = await appsPublisher.publishUpdate(args.folder, args.increment);
-      capture('app_published', { version: result.version, firstPublish: false });
       return result;
     },
     'apps:registerExisting': async (args) => {
@@ -1478,7 +1465,6 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
     'codeSession:create': async (args) => {
       const service = container.resolve<CodeSessionService>('codeSessionService');
       const session = await service.create(args);
-      capture('code_session_created', { agent: session.agent });
       return { session };
     },
     'codeSession:list': async () => {

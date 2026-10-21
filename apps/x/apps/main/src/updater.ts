@@ -1,5 +1,4 @@
 import { app, autoUpdater, net, nativeImage, BrowserWindow } from "electron";
-import { capture } from "@x/core/dist/analytics/posthog.js";
 import type { ipc } from "@x/shared";
 import { setDockUpdateReady } from './dock-badge.js';
 
@@ -119,7 +118,6 @@ export function initUpdater(): void {
   });
   autoUpdater.on("error", (err) => {
     setStatus({ state: "error", error: err.message, lastCheckedAt: status.lastCheckedAt });
-    capture("update_failed", { message: err.message });
   });
 
   // update.electronjs.org serves both Squirrel dialects from one URL:
@@ -172,13 +170,11 @@ export function checkForUpdates(): UpdaterStatus {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setStatus({ state: "error", error: error.message, lastCheckedAt: status.lastCheckedAt });
-      capture("update_failed", { message: error.message });
     }
   }
   return status;
 }
 
 export function quitAndInstallUpdate(): void {
-  capture("update_restarted", { from: status.version, to: status.newVersion });
   autoUpdater.quitAndInstall();
 }

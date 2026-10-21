@@ -290,6 +290,12 @@ In this fork, **Settings → Appearance → Sidebar shortcuts** controls Meeting
 
 With Sign in to Rowboat hidden, the signed-out account avatar and label are replaced by a simple Settings shortcut.
 
+This fork has no product telemetry SDKs, event reporting, installation tracking
+IDs, or telemetry opt-in. Local chat history and token counts remain available.
+Selected model providers, search engines, and explicitly connected services
+still receive the requests needed to perform their work. GitHub Actions test
+and release workflows have been removed; builds and tests run locally.
+
 **Settings → Search** configures Exa, [Tavily](https://docs.tavily.com/documentation/api-reference/endpoint/search), or [Firecrawl](https://docs.firecrawl.dev/api-reference/endpoint/search), selects the default provider, and tests it with one search request. The agent's `web-search` tool and composer use that selection. Tests and searches consume the selected provider's quota; there is no automatic fallback to another provider. Rowboat's account-backed search remains an explicit option.
 
 Keys are stored locally in `config/search.json` under the Rowboat work directory (normally `~/.rowboat`), with owner-only file permissions on Unix. They are not encrypted. Existing `config/exa-search.json` keys are recognized until search settings are first saved, and your own Exa key takes priority over account-backed search. Start a new chat after enabling search if an existing chat does not have the tool attached.

@@ -1,7 +1,6 @@
 import { ProviderV4 } from '@ai-sdk/provider';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { getAccessToken } from '../auth/tokens.js';
-import { getCurrentUseCase } from '../analytics/use_case.js';
 import { API_URL } from '../config/env.js';
 import { annotateReasoningFlags } from './models-dev.js';
 
@@ -11,10 +10,6 @@ export const authedFetch: typeof fetch = async (input, init) => {
     const token = await getAccessToken();
     const headers = new Headers(init?.headers);
     headers.set('Authorization', `Bearer ${token}`);
-    const ctx = getCurrentUseCase();
-    if (ctx?.useCase) headers.set('x-rowboat-use-case', ctx.useCase);
-    if (ctx?.subUseCase) headers.set('x-rowboat-sub-use-case', ctx.subUseCase);
-    if (ctx?.agentName) headers.set('x-rowboat-agent-name', ctx.agentName);
     return fetch(input, { ...init, headers });
 };
 

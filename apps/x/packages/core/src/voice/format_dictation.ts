@@ -2,7 +2,6 @@ import { generateText } from 'ai';
 import { createLanguageModel } from '../models/models.js';
 import { getBackgroundTaskAgentModel, resolveProviderConfig } from '../models/defaults.js';
 import { directCallReasoningOptions } from '../models/reasoning.js';
-import { captureLlmUsage } from '../analytics/usage.js';
 import { withUseCase } from '../analytics/use_case.js';
 
 const SYSTEM_PROMPT = `You clean up voice-dictated text into a message ready to post in a team chat (Slack-style).
@@ -45,14 +44,6 @@ export async function formatDictation(transcript: string): Promise<string | null
         maxOutputTokens: 4000,
         ...reasoning,
     }));
-
-    captureLlmUsage({
-        useCase: 'copilot_chat',
-        subUseCase: 'spaces_dictation_format',
-        model: modelId,
-        provider: providerName,
-        usage: result.usage,
-    });
 
     const formatted = result.text.trim();
     return formatted || null;

@@ -133,8 +133,6 @@ import { VideoCallView } from '@/components/video-call-view'
 import { PermissionDialog, type PermissionKind } from '@/components/permission-dialog'
 import { ProductTour, type TourNavTarget } from '@/components/product-tour'
 import { useMeetingTranscription, type CalendarEventMeta } from '@/hooks/useMeetingTranscription'
-import { useAnalyticsIdentity } from '@/hooks/useAnalyticsIdentity'
-import * as analytics from '@/lib/analytics'
 import { playAckCue, playAlertCue, playPopCue } from '@/lib/call-sounds'
 import { useTheme } from '@/contexts/theme-context'
 import { isMac } from '@/lib/shortcut'
@@ -963,8 +961,6 @@ function App() {
   type ShortcutPane = 'left' | 'right'
   type MarkdownHistoryHandlers = { undo: () => boolean; redo: () => boolean }
 
-  useAnalyticsIdentity()
-
   // File browser state (for Knowledge section)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [openFilePaths, setOpenFilePaths] = useState<string[]>([])
@@ -1249,10 +1245,6 @@ function App() {
   // TTS plays only during calls now (the standing read-aloud toggle was
   // retired; a per-message "read aloud" action may replace it later).
   const ttsEnabledRef = useRef(false)
-  // Voice-to-voice latency marks for the current call turn (performance.now):
-  // t0 = utterance accepted, submit = message sent, speak = first TTS
-  // speak(). Emitted as call_turn_latency when audio actually starts.
-  const callTurnMarksRef = useRef<{ t0: number; submit?: number; speak?: number } | null>(null)
   // A summon that CAN'T become a session (voice unconfigured, or the call
   // engine failed to start) is explained by the APP window — the companion
   // has no second surface of its own any more. Late-bound: the toast lives
@@ -1342,8 +1334,6 @@ function App() {
         !suppressSpeechTurnRef.current &&
         !speakerMutedRef.current
       ) {
-        const marks = callTurnMarksRef.current
-        if (marks && marks.speak === undefined) marks.speak = performance.now()
         spokeSegmentThisTurnRef.current = true
         ttsRef.current.speak(segment)
         setAssistantCaption(segment)
@@ -1397,20 +1387,6 @@ function App() {
     }
   }, [hoverIsProcessing, hoverConversation, pttStatus])
 
-  // Emit the turn's voice-to-voice latency breakdown once audio is audible.
-  useEffect(() => {
-    if (tts.state !== 'speaking') return
-    const marks = callTurnMarksRef.current
-    if (!marks || marks.submit === undefined || marks.speak === undefined) return
-    callTurnMarksRef.current = null
-    const now = performance.now()
-    analytics.callTurnLatency({
-      endpointToSubmitMs: marks.submit - marks.t0,
-      submitToSpeakMs: marks.speak - marks.submit,
-      speakToAudioMs: now - marks.speak,
-      totalMs: now - marks.t0,
-    })
-  }, [tts.state])
 
   const voice = useVoiceMode()
   const voiceRef = useRef(voice)
@@ -1691,7 +1667,6 @@ function App() {
   // the call button's main click) is "work together": screen shared, camera
   // off, floating pill — the user keeps working while the assistant watches
   // along. 'video'/'practice' open face-to-face full screen instead.
-  const callStartedAtMsRef = useRef<number | null>(null)
   // Epoch twin of the perf-clock mark above — gates which conversation
   // messages belong to THIS call (the pill's response mirror).
   const callStartedEpochRef = useRef(0)
@@ -1746,9 +1721,8 @@ function App() {
     // no silence detection, no misfires.
     void voiceRef.current
       .startPtt((text) => {
-        // Instant "heard you" feedback + start of the latency clock.
+        // Instant "heard you" feedback.
         playAckCue()
-        callTurnMarksRef.current = { t0: performance.now() }
         pendingVoiceInputRef.current = true
         // Ghostwriter chord: the marker rides the message itself — durable
         // in the transcript ("why did it paste?" answers itself), cache-safe
@@ -1782,21 +1756,15 @@ function App() {
     setCallMinimized(preset !== 'practice')
     inCallRef.current = true
     setInCall(true)
-    callStartedAtMsRef.current = performance.now()
     callStartedEpochRef.current = Date.now()
-    analytics.callStarted(preset)
   }, [video, setPttState])
 
   const endCall = useCallback(() => {
     if (!inCallRef.current) return
-    const startedAt = callStartedAtMsRef.current
-    callStartedAtMsRef.current = null
-    analytics.callEnded(startedAt != null ? (performance.now() - startedAt) / 1000 : 0)
     voiceRef.current.cancel()
     ttsEnabledRef.current = false
     ttsModeRef.current = 'summary'
     ttsRef.current.cancel()
-    callTurnMarksRef.current = null
     video.stop()
     setPracticeMode(false)
     practiceModeRef.current = false
@@ -2488,10 +2456,6 @@ function App() {
       await hoverChatRef.current.stop().catch(() => {})
     }
 
-    const marks = callTurnMarksRef.current
-    if (inCallRef.current && marks && marks.submit === undefined) {
-      marks.submit = performance.now()
-    }
     // Speech follows the QUESTION's modality: a TYPED question renders its
     // reply silently; a SPOKEN one (PTT utterance) is read aloud.
     suppressSpeechTurnRef.current = inCallRef.current && !pendingVoiceInputRef.current
@@ -2518,7 +2482,6 @@ function App() {
         sessionId = created.sessionId
         hoverRunIdRef.current = sessionId
         setHoverRunId(sessionId)
-        analytics.chatSessionCreated(sessionId)
         // The call was started from a fresh chat: bind that chat to the
         // session we just created — both surfaces show ONE conversation.
         // Only if the user hasn't switched or reset that chat since (its
@@ -2635,11 +2598,6 @@ function App() {
         await new Promise((resolve) => setTimeout(resolve, 600))
         await window.ipc.invoke('sessions:sendMessage', payload)
       }
-      analytics.chatMessageSent({
-        voiceInput: pendingVoiceInputRef.current || undefined,
-        voiceOutput: ttsEnabledRef.current ? ttsModeRef.current : undefined,
-        searchEnabled: searchEnabled || undefined,
-      })
     } catch (err) {
       console.error('[hover] submit failed:', err)
     } finally {
@@ -3576,7 +3534,6 @@ function App() {
           data: contentToSave,
           opts: { encoding: 'utf8' }
         })
-        analytics.noteEdited(pathToSave)
         // Store body-only baseline (matches what debouncedContent compares against)
         setInitialContentForPath(pathToSave, splitFrontmatter(contentToSave).body)
 
@@ -4321,10 +4278,6 @@ function App() {
 
     // Video chat mode: drain the webcam frames buffered since the last send
     // so they ride along with this message as inline image parts.
-    const marks = callTurnMarksRef.current
-    if (submitInCall && marks && marks.submit === undefined) {
-      marks.submit = performance.now()
-    }
 
     // Modality decides speech on calls: a TYPED question (composer, Skipper
     // panel, popout input) renders its reply silently; a SPOKEN one (PTT
@@ -4401,7 +4354,6 @@ function App() {
         currentRunId = createdSession.sessionId
         newRunCreatedAt = new Date().toISOString()
         if (isSubmitTabActive()) setRunId(currentRunId)
-        analytics.chatSessionCreated(currentRunId)
         // Update active chat tab's runId to the new run
         setChatTabs((prev) => prev.map((tab) => (
           tab.id === submitTabId && tab.chatId === submitTab.chatId
@@ -4583,11 +4535,6 @@ function App() {
           },
           config: sendConfig,
         })
-        analytics.chatMessageSent({
-          voiceInput: pendingVoiceInputRef.current || undefined,
-          voiceOutput: (submitInCall && ttsEnabledRef.current) ? ttsModeRef.current : undefined,
-          searchEnabled: searchEnabled || undefined,
-        })
       } else {
         const middlePaneContext = await submittedContext
         sendResult = await sendSessionMessage({
@@ -4598,11 +4545,6 @@ function App() {
             userMessageContext: userMessageContextFor(middlePaneContext),
           },
           config: sendConfig,
-        })
-        analytics.chatMessageSent({
-          voiceInput: pendingVoiceInputRef.current || undefined,
-          voiceOutput: (submitInCall && ttsEnabledRef.current) ? ttsModeRef.current : undefined,
-          searchEnabled: searchEnabled || undefined,
         })
       }
 
@@ -5275,12 +5217,6 @@ function App() {
       return !prev
     })
   }, [])
-
-  // Feature-importance funnel: one event per view the user lands on. Keyed on
-  // the view *type* so switching files/threads inside a view doesn't re-fire.
-  useEffect(() => {
-    analytics.viewOpened(currentViewState.type)
-  }, [currentViewState.type])
 
   // Safety net: Radix modal dialogs set `pointer-events: none` on <body> and
   // restore it on close — but a navigation that unmounts the dialog's owner
@@ -6415,7 +6351,6 @@ function App() {
     } catch (err) {
       console.error('Failed to mark onboarding complete:', err)
     }
-    analytics.onboardingCompleted()
     setShowOnboarding(false)
     if (opts?.startTour) {
       window.setTimeout(() => setTourActive(true), 400)
@@ -6440,7 +6375,6 @@ function App() {
           data: `# ${name}\n\n`,
           opts: { encoding: 'utf8' }
         })
-        analytics.noteCreated()
         setExpandedPaths(prev => new Set([...prev, parentPath]))
         navigateToFile(fullPath)
       } catch (err) {
@@ -6675,7 +6609,6 @@ function App() {
           const markdown = editorContentByPath[path]
             ?? (editorPathRef.current === path ? editorContent : '')
           void window.ipc.invoke('export:note', { markdown, format: cmd.format, title: getBaseName(path) })
-            .then(() => analytics.noteExported(cmd.format))
             .catch((err) => { console.error('Export failed:', err) })
           break
         }
@@ -6820,7 +6753,6 @@ function App() {
   }, [loadDirectory, navigateToFile, reloadMarkdownFileIntoEditor])
 
   const meetingNotePathRef = useRef<string | null>(null)
-  const meetingRecordingStartedAtMsRef = useRef<number | null>(null)
   const pendingCalendarEventRef = useRef<CalendarEventMeta | undefined>(undefined)
   const [meetingSummarizing, setMeetingSummarizing] = useState(false)
   const [showMeetingPermissions, setShowMeetingPermissions] = useState(false)
@@ -6834,8 +6766,6 @@ function App() {
     setRecordingMeetingSource(calEvent?.source ?? null)
     const notePath = await meetingTranscription.start(calEvent)
     if (notePath) {
-      meetingRecordingStartedAtMsRef.current = performance.now()
-      analytics.meetingRecordingStarted(Boolean(calEvent))
       meetingNotePathRef.current = notePath
       await handleVoiceNoteCreated(notePath)
     }
@@ -6861,9 +6791,6 @@ function App() {
   const handleToggleMeeting = useCallback(async () => {
     if (meetingTranscription.state === 'recording') {
       await meetingTranscription.stop()
-      const recordingStartedAt = meetingRecordingStartedAtMsRef.current
-      meetingRecordingStartedAtMsRef.current = null
-      analytics.meetingRecordingStopped(recordingStartedAt != null ? (performance.now() - recordingStartedAt) / 1000 : 0)
       setRecordingMeetingSource(null)
 
       // Read the final transcript and generate meeting notes via LLM
@@ -6911,7 +6838,6 @@ function App() {
             }
           }
         } catch (err) {
-          analytics.meetingSummarizeFailed()
           console.error('[meeting] Failed to generate meeting notes:', err)
         }
         setMeetingSummarizing(false)
@@ -7914,7 +7840,6 @@ function App() {
                                 const title = getBaseName(notePath)
                                 try {
                                   await window.ipc.invoke('export:note', { markdown, format, title })
-                                  analytics.noteExported(format)
                                 } catch (err) {
                                   console.error('Export failed:', err)
                                 }

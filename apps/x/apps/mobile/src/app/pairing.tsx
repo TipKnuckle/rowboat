@@ -13,8 +13,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import * as analytics from '@/lib/analytics';
 import { parseQrPayload, probeUrls, useConnection } from '@/lib/connection';
 import { useColors } from '@/theme/colors';
 
@@ -48,7 +46,6 @@ export default function PairingScreen() {
         return;
       }
       await pair({ url: healthy, token: pairToken, name });
-      analytics.mobilePaired(method);
       router.replace('/chat');
     },
     [pair],

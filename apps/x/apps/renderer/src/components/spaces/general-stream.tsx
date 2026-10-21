@@ -44,8 +44,6 @@ import { runFind, searchInstead } from '@/lib/spaces-find'
 import { toast } from '@/lib/toast'
 // The Spaces toast queue has no renderer; sonner is what the person sees.
 import { toast as notify } from 'sonner'
-import * as analytics from '@/lib/analytics'
-import { containsRowboatAddress } from '@/lib/spaces-mentions'
 import { directAvatarId, isSelfDirect } from '@/lib/spaces-direct'
 
 // The space's one stream: ROOT messages in order; each message's flat thread
@@ -337,7 +335,6 @@ export function GeneralStream({
         }
         // Replying follows the thread and reads it up to our reply (the org's rule); mirror it.
         noteThread(org.id, space.id, rootMessageId, { following: true, readOffset: posted.offset, lastReplyOffset: posted.offset })
-        analytics.spacesMessagePosted({ kind: 'topic', mentionsRowboat: containsRowboatAddress(body) })
         maybeInvokeRowboat(org, space, { rootMessageId, label }, posted.id, body, agent)
         notify.success(`Auto replied in “${label}”`, { ...AUTO_TOAST, action: { label: 'Open thread', onClick: () => onOpenThread(rootMessageId) } })
     }
@@ -429,25 +426,21 @@ export function GeneralStream({
     // a click adds the mention, a second click takes it back, and the ×
     // declines it for this draft, which the declined set remembers across an
     // edit-and-resend. A verdict is matched to its text with mentions
-    // stripped, so tagging never re-asks Jev. Every gesture is logged: Jev
-    // learns nothing from them, but the threshold can.
+    // stripped, so tagging never re-asks Jev.
     const tagSuggestions = useTagSuggestionsEnabled()
     const [currentDraft, setCurrentDraft] = useState('')
     const [declined, setDeclined] = useState<ReadonlySet<string>>(() => new Set())
     const HERE_TOKEN = mentionToken({ kind: 'here' })
-    const toggleTag = (token: string, kind: 'member' | 'here') => {
+    const toggleTag = (token: string) => {
         if (currentDraft.includes(token)) {
             const next = currentDraft.replace(`${token} `, '').replace(token, '').trim()
             setSeed({ text: next, nonce: Date.now() })
-            analytics.spacesAutoTagChip({ action: 'remove', kind })
         } else {
             setSeed({ text: `${token} `, nonce: Date.now(), append: true })
-            analytics.spacesAutoTagChip({ action: 'accept', kind })
         }
     }
-    const declineTag = (key: string, kind: 'member' | 'here') => {
+    const declineTag = (key: string) => {
         setDeclined((prev) => new Set(prev).add(key))
-        analytics.spacesAutoTagChip({ action: 'decline', kind })
     }
     const tagChips: BannerChip[] = verdict
         ? [
@@ -459,22 +452,15 @@ export function GeneralStream({
                           key: t.memberId,
                           label: `@${t.name}`,
                           added: currentDraft.includes(token),
-                          onToggle: () => toggleTag(token, 'member'),
-                          onDecline: () => declineTag(t.memberId, 'member'),
+                          onToggle: () => toggleTag(token),
+                          onDecline: () => declineTag(t.memberId),
                       }
                   }),
               ...(verdict.here !== null && !declined.has('here')
-                  ? [{ key: 'here', label: '@here', added: currentDraft.includes(HERE_TOKEN), onToggle: () => toggleTag(HERE_TOKEN, 'here'), onDecline: () => declineTag('here', 'here') }]
+                  ? [{ key: 'here', label: '@here', added: currentDraft.includes(HERE_TOKEN), onToggle: () => toggleTag(HERE_TOKEN), onDecline: () => declineTag('here') }]
                   : []),
           ]
         : []
-    const noteTagOutcome = (held: StreamVerdict, body: string) => {
-        const offers = [...held.tags.map((t) => ({ key: t.memberId, token: mentionToken({ kind: 'member', id: t.memberId, label: t.name }) })), ...(held.here !== null ? [{ key: 'here', token: HERE_TOKEN }] : [])]
-        if (offers.length === 0) return
-        const accepted = offers.filter((o) => body.includes(o.token)).length
-        const declinedCount = offers.filter((o) => !body.includes(o.token) && declined.has(o.key)).length
-        analytics.spacesAutoTagsSent({ shown: offers.length, accepted, declined: declinedCount, ignored: offers.length - accepted - declinedCount })
-    }
     // The text as it stands now comes off the composer's stored draft (kept
     // current on every keystroke). Attachments do not travel: staging is text.
     const moveDraftToThread = (rootMessageId: string) => {
@@ -491,7 +477,6 @@ export function GeneralStream({
             confirmedRef.current || (autoRouteMode === 'preview' && !!verdict && stripMentionTokens(verdict.body) === stripMentionTokens(body))
         confirmedRef.current = false
         if (confirmed) {
-            if (verdict) noteTagOutcome(verdict, body)
             setVerdict(null)
             setDeclined(new Set())
             return postToStream(body, agent)
@@ -616,7 +601,6 @@ export function GeneralStream({
             const { message: posted } = await postPoll({ orgId: org.id, spaceId: space.id, input })
             ingestStreamMessage(org.id, space.id, posted)
             markStreamRead(org.id, space.id, posted.offset, { sync: false })
-            analytics.spacesMessagePosted({ kind: 'general', mentionsRowboat: false })
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not post the poll', 'error')
             throw err
@@ -699,7 +683,6 @@ export function GeneralStream({
                 orgId: org.id, spaceId: space.id, messageId: message.id, emoji, action,
             })
             updateStreamMessage(org.id, space.id, updated)
-            analytics.spacesReactionToggled({ action })
         } catch (err) {
             updateStreamMessage(org.id, space.id, message)
             toast(err instanceof Error ? err.message : 'Could not react', 'error')
@@ -728,7 +711,6 @@ export function GeneralStream({
                 orgId: org.id, spaceId: space.id, messageId: message.id,
             })
             updateStreamMessage(org.id, space.id, deleted)
-            analytics.spacesMessageDeleted()
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not delete', 'error')
         }
@@ -1219,7 +1201,6 @@ export function GeneralStream({
                             try {
                                 const result = await invokeSpace('spaces:createInvite', { orgId: org.id, spaceIds: [space.id] })
                                 await navigator.clipboard.writeText(result.link)
-                                analytics.spacesInviteLinkCopied()
                                 toast('Invite link copied to clipboard', 'success')
                             } catch (err) {
                                 toast(err instanceof Error ? err.message : 'Could not create an invite', 'error')
@@ -1248,7 +1229,6 @@ export function GeneralStream({
                                 nav: { openThread: onOpenThread, openStream: () => {} },
                             })
                             notify.dismiss(finding)
-                            analytics.spacesFind({ outcome: res.outcome })
                             if (res.outcome === 'not-found') {
                                 notify.info(`No match for "${query}"`, { ...AUTO_TOAST, action: { label: 'Open search', onClick: () => searchInstead(query) } })
                             } else if (res.outcome === 'no-key') {

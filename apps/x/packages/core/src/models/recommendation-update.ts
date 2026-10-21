@@ -13,7 +13,6 @@ import type { ModelRecommendations } from "@x/shared/dist/rowboat-account.js";
 import container from "../di/container.js";
 import { WorkDir } from "../config/config.js";
 import { getRowboatConfig } from "../config/rowboat.js";
-import { capture } from "../analytics/posthog.js";
 import { IModelConfigRepo } from "./repo.js";
 import { getModelCatalog } from "./catalog.js";
 
@@ -152,12 +151,6 @@ export async function checkRecommendationUpdate(): Promise<RecommendationUpdateC
     try {
         const update = await computeUpdate();
         if (!update) return { shouldShow: false };
-        capture("llm_recommendation_update_shown", {
-            flavor: update.flavor,
-            recommendation_hash: update.hash,
-            row_count: update.rows.length,
-            slots: update.rows.map((r) => r.slot),
-        });
         return { shouldShow: true, ...update };
     } catch (error) {
         // Best-effort: the prompt must never break launch.
@@ -198,11 +191,5 @@ export async function resolveRecommendationUpdate(args: {
             console.warn(`[models] Could not record recommendation as seen for ${args.flavor}:`, error);
         });
     }
-    capture(applied.length > 0 ? "llm_recommendation_update_applied" : "llm_recommendation_update_dismissed", {
-        flavor: args.flavor,
-        recommendation_hash: args.hash,
-        requested_slots: args.apply,
-        applied_slots: applied,
-    });
     return { applied };
 }

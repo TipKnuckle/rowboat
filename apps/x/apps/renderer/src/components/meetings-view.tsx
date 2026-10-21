@@ -8,7 +8,6 @@ import { MeetingEventContextMenu, MeetingNoteContextMenu } from '@/components/me
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { formatRelativeTime } from '@/lib/relative-time'
-import * as analytics from '@/lib/analytics'
 import { extractConferenceLink } from '@/lib/calendar-event'
 import { cn } from '@/lib/utils'
 import type { MeetingTranscriptionState } from '@/hooks/useMeetingTranscription'
@@ -1317,12 +1316,12 @@ export function MeetingsView({ onOpenNote, onTakeMeetingNotes, meetingState, mee
               </thead>
               <tbody>
                 {notes.map((note) => (
-                  <MeetingNoteContextMenu key={note.path} path={note.path} onOpen={() => { analytics.meetingNoteOpened(); onOpenNote(note.path) }}>
+                  <MeetingNoteContextMenu key={note.path} path={note.path} onOpen={() => { onOpenNote(note.path) }}>
                     <tr className="border-b border-border/50 last:border-b-0 hover:bg-muted/20">
                       <td className="px-4 py-3 align-top">
                         <button
                           type="button"
-                          onClick={() => { analytics.meetingNoteOpened(); onOpenNote(note.path) }}
+                          onClick={() => { onOpenNote(note.path) }}
                           className="block w-full min-w-0 text-left text-sm font-medium text-foreground hover:underline"
                         >
                           <span className="block truncate">{note.name}</span>

@@ -38,7 +38,6 @@ import {
 import { useBackgroundTaskAgentStatus } from '@/hooks/use-bg-task-agent-status'
 import { formatRelativeTime } from '@/lib/relative-time'
 import { toast } from '@/lib/toast'
-import * as analytics from '@/lib/analytics'
 import type { ConversationItem } from '@/lib/chat-conversation'
 import { fetchAgentRunTranscript } from '@/lib/agent-transcript'
 import { useAgentRunTranscript } from '@/hooks/use-agent-run-transcript'
@@ -390,7 +389,6 @@ function NewTaskDialog({
                 ...(projectId ? { projectId } : {}),
             })
             if (result.success && result.slug) {
-                analytics.bgAgentCreated({ method: 'coding', hasTriggers: Boolean(triggers) })
                 onCreated(result.slug)
             } else {
                 toast(result.error ?? 'Failed to create task', 'error')
@@ -404,7 +402,6 @@ function NewTaskDialog({
 
     const submitDescribe = () => {
         if (!canSubmitDescribe || !onCreateWithCopilot) return
-        analytics.bgAgentCreated({ method: 'copilot', hasTriggers: false })
         onCreateWithCopilot(description.trim())
         onClose()
     }
@@ -419,7 +416,6 @@ function NewTaskDialog({
                 ...(triggers ? { triggers } : {}),
             })
             if (result.success && result.slug) {
-                analytics.bgAgentCreated({ method: 'manual', hasTriggers: Boolean(triggers) })
                 onCreated(result.slug)
             } else {
                 toast(result.error ?? 'Failed to create task', 'error')
@@ -1492,7 +1488,6 @@ function TaskDetail({
             if (draft.effort !== task.effort) partial.effort = draft.effort
             const result = await window.ipc.invoke('bg-task:patch', { slug, partial })
             if (result.success && result.task) {
-                analytics.bgAgentUpdated()
                 setTask(result.task)
                 setDraft(result.task)
                 setEditingInstructions(false)
@@ -1514,14 +1509,12 @@ function TaskDetail({
         if (!task) return
         const result = await window.ipc.invoke('bg-task:patch', { slug, partial: { active } })
         if (result.success && result.task) {
-            analytics.bgAgentToggled(active)
             setTask(result.task)
             setDraft(result.task)
         }
     }
 
     const runNow = async () => {
-        analytics.bgAgentRunClicked()
         const result = await window.ipc.invoke('bg-task:run', { slug })
         if (!result.success) {
             toast(result.error ?? 'Run failed', 'error')
@@ -1529,14 +1522,12 @@ function TaskDetail({
     }
 
     const stopRun = async () => {
-        analytics.bgAgentStopped()
         await window.ipc.invoke('bg-task:stop', { slug })
     }
 
     const deleteTask = async () => {
         const result = await window.ipc.invoke('bg-task:delete', { slug })
         if (result.success) {
-            analytics.bgAgentDeleted()
             onDeleted()
         } else {
             toast(result.error ?? 'Delete failed', 'error')
@@ -1790,7 +1781,6 @@ export function BgTasksView({ onCreateWithCopilot, onEditWithCopilot, initialSlu
                 toast(result.error ?? 'Failed to update task', 'error')
                 return
             }
-            analytics.bgAgentToggled(active)
             // Optimistically reflect the new state without re-fetching the whole list.
             setItems(prev => prev.map(t => t.slug === slug ? { ...t, active } : t))
         } catch (err) {
@@ -1809,7 +1799,6 @@ export function BgTasksView({ onCreateWithCopilot, onEditWithCopilot, initialSlu
         startingSlugsRef.current.add(slug)
         setStartingSlugs(new Set(startingSlugsRef.current))
         try {
-            analytics.bgAgentRunClicked()
             const result = await window.ipc.invoke('bg-task:run', { slug })
             if (!result.success) toast(result.error ?? 'Run failed', 'error')
         } catch (err) {
@@ -1844,7 +1833,6 @@ export function BgTasksView({ onCreateWithCopilot, onEditWithCopilot, initialSlu
         try {
             const result = await window.ipc.invoke('bg-task:delete', { slug: deleteTarget.slug })
             if (result.success) {
-                analytics.bgAgentDeleted()
                 setDeleteTarget(null)
                 void load()
             } else {

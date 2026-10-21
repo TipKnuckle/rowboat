@@ -28,7 +28,6 @@ import {
 import { getDefaultModelAndProvider, resolveProviderConfig } from '../models/defaults.js';
 import { listGatewayModels } from '../models/gateway.js';
 import { createProvider } from '../models/models.js';
-import { captureLlmUsage } from '../analytics/usage.js';
 import { withUseCase } from '../analytics/use_case.js';
 import { isSignedIn } from '../account/account.js';
 import { createRun, createMessage, stop as stopRun } from '../runtime/legacy/runs.js';
@@ -334,7 +333,6 @@ async function handleLlmGenerate(
             maxOutputTokens,
             abortSignal: abort.signal,
         }));
-        captureLlmUsage({ useCase: 'app_llm_generate', subUseCase: slug, model: resolved.model, provider: resolved.provider, usage: result.usage });
         res.json({
             text: result.text,
             model: resolved.model,

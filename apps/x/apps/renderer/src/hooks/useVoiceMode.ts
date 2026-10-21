@@ -3,8 +3,6 @@ import { buildDeepgramListenUrl } from '@/lib/deepgram-listen-url';
 import { finalizeDeepgramStream } from '@/lib/deepgram-finalize';
 import { useRowboatAccount } from '@/hooks/useRowboatAccount';
 import { fetchRowboatConfig } from '@/hooks/use-rowboat-config';
-import posthog from 'posthog-js';
-import * as analytics from '@/lib/analytics';
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'submitting';
 
@@ -244,8 +242,6 @@ export function useVoiceMode() {
 
         // Show listening immediately — don't wait for WebSocket
         setState('listening');
-        analytics.voiceInputStarted();
-        posthog.people.set_once({ has_used_voice: true });
 
         // Settle the OS-level microphone permission before capturing. On the
         // first-ever use (macOS) the permission is 'not-determined'; calling

@@ -17,9 +17,6 @@ vi.mock('../models/models.js', () => ({
 vi.mock('../models/reasoning.js', () => ({
     directCallReasoningOptions: vi.fn(async () => ({})),
 }));
-vi.mock('../analytics/usage.js', () => ({
-    captureLlmUsage: vi.fn(),
-}));
 
 import { DeckOutlineError, editSlide, generateDeckOutline, generateSlide } from './deck_outline.js';
 

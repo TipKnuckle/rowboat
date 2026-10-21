@@ -1,6 +1,5 @@
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import * as analytics from './analytics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import {
@@ -87,7 +86,6 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   // Key rotation on the Mac invalidates this pairing permanently — drop it
   // and send the user back to the pairing screen instead of retrying forever.
   const handleUnauthorized = useCallback(() => {
-    analytics.mobileUnpaired('unauthorized');
     void SecureStore.deleteItemAsync(STORE_KEY);
     setPairing(null);
     router.replace('/pairing');
@@ -119,7 +117,7 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
     }
     let wasDisconnected = false;
     const offStatus = clients.events.onStatus((next) => {
-      if (next === 'connected' && wasDisconnected) analytics.mobileReconnected();
+      if (next === 'connected' && wasDisconnected) {}
       if (next === 'disconnected') wasDisconnected = true;
       setStatus(next);
     });

@@ -6,8 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sessions as sessionsShared } from '@x/shared';
-
-import * as analytics from '@/lib/analytics';
 import { useConnection } from '@/lib/connection';
 import { useColors } from '@/theme/colors';
 
@@ -165,7 +163,6 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           detail="Unpair"
           detailColor={colors.destructive}
           onDetail={() => {
-            analytics.mobileUnpaired('user');
             void unpair().then(() => router.replace('/spaces'));
           }}
         />

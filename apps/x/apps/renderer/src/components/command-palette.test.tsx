@@ -77,8 +77,6 @@ vi.mock('@/components/code/use-code-sessions', () => ({
     projectLabel: (row: { project: { name: string } }) => row.project.name,
 }))
 vi.mock('@/lib/feature-flags', () => ({ SPACES_ENABLED: true, LOCAL_RUNTIME: true }))
-vi.mock('@/lib/analytics', () => ({ searchOpened: vi.fn(), searchExecuted: vi.fn(), searchResultSelected: vi.fn() }))
-vi.mock('posthog-js', () => ({ default: { people: { set_once: vi.fn() } } }))
 
 // A code-mode chat is a chat session too: it arrives in the chat list under
 // the same id the code-session store knows it by.

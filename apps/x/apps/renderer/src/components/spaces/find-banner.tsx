@@ -2,7 +2,6 @@ import { toast as notify } from 'sonner'
 import { AutoBanner } from '@/components/spaces/auto-banner'
 import { AUTO_TOAST } from '@/lib/spaces-auto-route'
 import { clearFindSession, findNext, landingOf, searchInstead, useFindSession, type FindLanding, type FindNav } from '@/lib/spaces-find'
-import * as analytics from '@/lib/analytics'
 
 // The /find banner (2026-09-24): 'Match 1 of 4 for "…"' with "Next match",
 // "Open search", and a close. Rendered by both panes; it shows only in the
@@ -26,13 +25,11 @@ export function FindBanner({ orgId, spaceId, pane, nav }: {
     const hasNext = session.index + 1 < session.ranked.length
     const query = session.query
     const next = () => {
-        analytics.spacesFind({ outcome: 'next' })
         if (!findNext(nav)) {
             notify.info('No more matches', { ...AUTO_TOAST, action: { label: 'Open search', onClick: () => searchInstead(query) } })
         }
     }
     const search = () => {
-        analytics.spacesFind({ outcome: 'search-instead' })
         clearFindSession()
         searchInstead(query)
     }

@@ -54,7 +54,6 @@ import { getSpaceReadState, markStreamRead, markThreadRead, useStreamReadOffset 
 import { toast } from '@/lib/toast'
 import { copySpacesLink } from '@/lib/spaces-copy-link'
 import { cn } from '@/lib/utils'
-import * as analytics from '@/lib/analytics'
 
 export { OrgMonogram } from '@/components/spaces/atoms'
 
@@ -431,7 +430,6 @@ function SpacePane({ org, space, selection, onSelect, onSwitchSpace, onOpenSessi
         try {
             const result = await invokeSpace('spaces:createInvite', { orgId: org.id, spaceIds: [space.id] })
             await navigator.clipboard.writeText(result.link)
-            analytics.spacesInviteLinkCopied()
             toast('Invite link copied to clipboard', 'success')
         } catch (err) {
             toast(err instanceof Error ? err.message : 'Could not create an invite', 'error')
@@ -699,7 +697,6 @@ function SpacePane({ org, space, selection, onSelect, onSwitchSpace, onOpenSessi
             closeDoc()
             return
         }
-        analytics.spacesTabViewed('whiteboard')
         const recent = [...boards].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
         if (recent) {
             onSelect({ kind: 'whiteboard', assetId: recent.id })
@@ -739,7 +736,6 @@ function SpacePane({ org, space, selection, onSelect, onSwitchSpace, onOpenSessi
     // rail stays where it is — it is a sidebar, not a flyout.
     const select = (next: RailSelection) => {
         onSelect(next)
-        analytics.spacesTabViewed(next.kind === 'general' ? 'general' : (next.kind === 'file' || next.kind === 'files' || next.kind === 'attachment') ? 'files' : next.kind === 'whiteboard' ? 'whiteboard' : 'topics')
         placeSelection(next)
     }
     const openFile = (assetId: string) => select({ kind: 'file', assetId })

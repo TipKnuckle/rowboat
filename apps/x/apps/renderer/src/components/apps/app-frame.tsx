@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, BadgeCheck, ExternalLink, Info, RotateCw, UploadCloud } from 'lucide-react'
 import type { rowboatApp } from '@x/shared'
-import { appOpened } from '@/lib/analytics'
 import { AppDetail } from '@/components/apps/app-detail'
 import { PublishDialog } from '@/components/apps/publish-dialog'
 
@@ -18,9 +17,6 @@ export function AppFrame({ app, onBack }: { app: rowboatApp.AppSummary; onBack: 
   const [loadState, setLoadState] = useState<'loading' | 'ok' | 'stuck'>('loading')
   const title = app.manifest?.name ?? app.folder
 
-  useEffect(() => {
-    appOpened(app.folder)
-  }, [app.folder])
 
   // Reset the watchdog when the target changes (adjust-during-render pattern).
   const [watchKey, setWatchKey] = useState(`${app.folder}:${reloadNonce}`)

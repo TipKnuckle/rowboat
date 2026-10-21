@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { invokeSpace } from '@/lib/spaces-invoke'
-import * as analytics from '@/lib/analytics'
 import { listNames } from '@/lib/spaces-invites'
 
 type InviteLinkState =
@@ -90,7 +89,6 @@ export function InviteLinkPanel({ orgId, spaceIds }: { orgId: string; spaceIds: 
     const copyLink = (link: string) =>
         navigator.clipboard.writeText(link).then(
             () => {
-                analytics.spacesInviteLinkCopied()
                 setCopy('copied')
                 if (timer.current) clearTimeout(timer.current)
                 timer.current = setTimeout(() => setCopy('idle'), 1000)
