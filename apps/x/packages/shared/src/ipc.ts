@@ -168,7 +168,7 @@ const KnowledgeSourceConfigSchema = z.object({
 const UpdaterStatusSchema = z.object({
   state: z.enum(['disabled', 'unsupported', 'idle', 'checking', 'downloading', 'ready', 'error']),
   version: z.string(),
-  reason: z.enum(['dev', 'platform', 'not-in-applications']).optional(),
+  reason: z.enum(['dev', 'manual', 'platform', 'not-in-applications']).optional(),
   newVersion: z.string().optional(),
   // Markdown body of the staged update's GitHub release, when known — the
   // restart card renders it verbatim.

@@ -38,6 +38,21 @@ to show Search, Tool inventory, and Local mail.
 Restored assistant tabs, layout, and drafts are kept separately for each server
 URL and for local mode. Changing a server's URL starts a fresh tab layout;
 its saved conversations remain available in server history.
+Packaged builds of this personal fork use manual updates; they do not install
+upstream Rowboat releases automatically.
+
+To package the desktop for an Apple Silicon Mini, after installing the workspace
+dependencies, run on an Apple Silicon Mac:
+
+```sh
+cd apps/x/apps/main
+npx --yes --package=node@22 node package-local.cjs
+```
+
+This builds the desktop and its dependencies and writes `out/Rowboat-darwin-arm64/Rowboat.app`.
+Quit the existing Rowboat app before replacing it in Applications. Its client
+configuration is retained; the backend's data stays on Dagonet. This personal
+build is not Developer ID signed or notarized.
 
 Validate reachability **from the Mini**, not only the server:
 

@@ -66,6 +66,12 @@ function showReadyBadge(): void {
 export function initUpdater(): void {
   const version = app.getVersion();
 
+  // 2026-10-21: this personal fork ships manually; upstream updates would replace it.
+  if (app.isPackaged) {
+    status = { state: "disabled", version, reason: "manual" };
+    return;
+  }
+
   if (!app.isPackaged) {
     status = { state: "disabled", version, reason: "dev" };
     return;

@@ -197,7 +197,9 @@ function UpdateSettings() {
     case 'disabled':
       body = (
         <p className="text-xs text-muted-foreground">
-          Automatic updates are disabled in development builds.
+          {status.reason === 'manual'
+            ? 'This personal fork is updated manually by installing a new build.'
+            : 'Automatic updates are disabled in development builds.'}
         </p>
       )
       break
