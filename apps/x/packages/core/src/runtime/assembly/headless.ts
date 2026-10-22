@@ -6,8 +6,10 @@ import {
     reduceTurn,
     type TurnState,
 } from "@x/shared/dist/turns.js";
-import type { ITurnRuntime, TurnOutcome } from "../turns/api.js";
+import type { ITurnRuntime, ModelGate, TurnOutcome } from "../turns/api.js";
 import type { IDefaultModelResolver } from "../../models/default-model-resolver.js";
+import { backgroundScheduler } from "../../application/lib/background-scheduler.js";
+import { registerHeadlessRun } from "../../application/lib/headless-run-registry.js";
 
 // Drop-in replacement for the old headless runs pattern
 // (createRun → createMessage → waitForRunCompletion → extractAgentResponse):
@@ -43,6 +45,17 @@ export interface HeadlessAgentOptions {
     // default). Background callers that want cheap turns can pin "low".
     reasoningEffort?: "low" | "medium" | "high";
     signal?: AbortSignal;
+    /**
+     * This run is opportunistic background work: consult the background
+     * scheduler before every model call, not merely before the run starts.
+     *
+     * Declared here rather than inferred because the obvious signals all lie:
+     * `sessionId === null` is also true of a subagent spawned from a live chat
+     * (which must never be deferred), and the use case defaults to
+     * `copilot_chat` on both sides. So the entry point says so: the
+     * defer-aware wrappers do, manual runs and subagents do not.
+     */
+    background?: boolean;
     // Old waitForRunCompletion({ throwOnError: true }) semantics: `done`
     // rejects with HeadlessRunError unless the turn completes.
     throwOnError?: boolean;
@@ -175,9 +188,40 @@ export class HeadlessAgentRunner implements IHeadlessAgentRunner {
             },
         });
 
+        // Own controller. The caller's signal is usually absent — no existing
+        // background caller passes one — and a run that can now sit in the
+        // scheduler's queue has to stay interruptible while it waits.
+        // Registered before the advance starts so there is no window where the
+        // turn exists but cannot be stopped.
+        const controller = new AbortController();
+        const forwardAbort = () => controller.abort();
+        if (options.signal) {
+            if (options.signal.aborted) {
+                controller.abort();
+            } else {
+                options.signal.addEventListener("abort", forwardAbort, { once: true });
+            }
+        }
+        const registration = registerHeadlessRun(turnId, () => controller.abort());
+
+        const label = `headless:${options.subUseCase ?? options.agentId ?? "run"}`;
+        const modelGate: ModelGate | undefined = options.background
+            ? async ({ modelCallIndex }) =>
+                backgroundScheduler.acquire(
+                    `${label} step ${modelCallIndex}`,
+                    controller.signal,
+                )
+            : undefined;
+
         const execution = this.turnRuntime.advanceTurn(turnId, undefined, {
-            signal: options.signal,
+            signal: controller.signal,
+            ...(modelGate ? { modelGate } : {}),
         });
+        const settled = execution.outcome.catch(() => undefined).finally(() => {
+            registration.unregister();
+            options.signal?.removeEventListener("abort", forwardAbort);
+        });
+        registration.track(settled);
         // Drain the execution stream: live delivery rides the turn event bus,
         // and an unconsumed HotStream would buffer every durable event in
         // memory until the turn settles.

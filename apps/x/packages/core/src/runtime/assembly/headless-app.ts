@@ -1,6 +1,4 @@
 import container from "../../di/container.js";
-import { chatActivity } from "../../application/lib/chat-activity.js";
-import { shouldDeferBackgroundTasks } from "../../models/defaults.js";
 import {
     type HeadlessAgentHandle,
     type HeadlessAgentOptions,
@@ -24,30 +22,32 @@ export function runHeadlessAgent(
     return runner().run(options);
 }
 
-// When the user enabled "Defer background tasks while a chat is running"
-// (recommended for local models — a background run competes with the chat
-// for the same hardware), wait for the chat to go idle before starting.
-// Re-check after each wake: another chat turn may have started meanwhile.
-async function waitForChatIdleIfConfigured(): Promise<void> {
-    while ((await shouldDeferBackgroundTasks()) && chatActivity.activeCount > 0) {
-        await chatActivity.waitUntilIdle();
-    }
-}
+// Background work: the run is marked opportunistic, so the scheduler gates
+// every model call it makes — at the start AND between steps — rather than
+// checking once before launch, which is all the old boolean did.
+//
+// Nothing is awaited here. Waiting belongs inside the run's model calls, so
+// the durable log never records a step that was not issued and a run releases
+// the slot while it waits on tools.
+//
+// One consequence worth stating: a run parked in the gate is parked *inside*
+// the advance, which holds the turn's per-turn lock. A durable `cancel` input
+// would queue behind that lock, so stopping a deferred run relies on the
+// headless run registry aborting it instead — see headless-run-registry.ts.
+const BACKGROUND = { background: true } as const;
 
-/** startHeadlessAgent for background work: honors the defer-while-chatting setting. */
-export async function startWhenPossible(
+/** startHeadlessAgent for background work: honors the background scheduling setting. */
+export function startWhenPossible(
     options: HeadlessAgentOptions,
 ): Promise<HeadlessAgentHandle> {
-    await waitForChatIdleIfConfigured();
-    return startHeadlessAgent(options);
+    return startHeadlessAgent({ ...options, ...BACKGROUND });
 }
 
-/** runHeadlessAgent for background work: honors the defer-while-chatting setting. */
-export async function runWhenPossible(
+/** runHeadlessAgent for background work: honors the background scheduling setting. */
+export function runWhenPossible(
     options: HeadlessAgentOptions,
 ): Promise<HeadlessAgentResult & { turnId: string }> {
-    await waitForChatIdleIfConfigured();
-    return runHeadlessAgent(options);
+    return runHeadlessAgent({ ...options, ...BACKGROUND });
 }
 
 export { toolInputPaths } from "./headless.js";

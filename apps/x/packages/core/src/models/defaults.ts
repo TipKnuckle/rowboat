@@ -1,5 +1,5 @@
 import z from "zod";
-import { LlmModelConfig, LlmProvider, ModelSelection as ModelSelectionSchema, type TaskModelKey } from "@x/shared/dist/models.js";
+import { BackgroundScheduling, BACKGROUND_QUIET_PERIOD_MS, LlmModelConfig, LlmProvider, ModelSelection as ModelSelectionSchema, type TaskModelKey } from "@x/shared/dist/models.js";
 import { IModelConfigRepo } from "./repo.js";
 import container from "../di/container.js";
 
@@ -56,13 +56,31 @@ export function asRunModelOptions(selection: ModelSelection): {
 }
 
 /**
- * "Defer background tasks while a chat is running" (settings checkbox,
- * models.json `deferBackgroundTasks`). Read at each background invocation so
- * toggling takes effect immediately.
+ * How background model calls share the hardware with chat (settings select,
+ * models.json `backgroundScheduling`). Read at every scheduling decision so a
+ * change takes effect immediately.
+ *
+ * The fallback to the legacy `deferBackgroundTasks` flag happens here rather
+ * than in migrateModelsConfig because it has to cover two shapes of stored
+ * preference: v1 configs carry the flag forward through migration, and v2
+ * files written before this setting existed carry it directly.
  */
-export async function shouldDeferBackgroundTasks(): Promise<boolean> {
+export async function getBackgroundScheduling(): Promise<BackgroundScheduling> {
     const cfg = await readConfig();
-    return cfg?.deferBackgroundTasks === true;
+    if (cfg?.backgroundScheduling) return cfg.backgroundScheduling;
+    return cfg?.deferBackgroundTasks === true ? "immediate" : "off";
+}
+
+/**
+ * Quiet period opportunistic background work waits for after a chat turn, or
+ * null when scheduling is off and background calls may overlap the chat.
+ * `immediate` is 0: still never concurrent with a turn, but no extra wait once
+ * the turn settles.
+ */
+export async function getBackgroundQuietPeriodMs(): Promise<number | null> {
+    const setting = await getBackgroundScheduling();
+    if (setting === "off") return null;
+    return BACKGROUND_QUIET_PERIOD_MS[setting] ?? 0;
 }
 
 /**

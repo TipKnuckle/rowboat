@@ -3,6 +3,7 @@ import { createLanguageModel } from '../models/models.js';
 import { getChatTitleModel, resolveProviderConfig } from '../models/defaults.js';
 import { directCallReasoningOptions } from '../models/reasoning.js';
 import { withUseCase } from '../analytics/use_case.js';
+import { backgroundScheduler } from '../application/lib/background-scheduler.js';
 
 const SYSTEM_PROMPT = `You name chat conversations. Given the user's first message, reply with a concise title for the conversation.
 
@@ -43,13 +44,20 @@ export async function generateChatTitle(firstMessage: string): Promise<string | 
     // effort on the chatTitle task slot overrides the low pin (spread last so
     // its Anthropic budget floor can raise the cap).
     const reasoning = await directCallReasoningOptions(providerConfig.flavor, modelId, effort ?? 'low');
-    const result = await withUseCase({ useCase: 'copilot_chat', subUseCase: 'chat_title' }, () => generateText({
-        model,
-        system: SYSTEM_PROMPT,
-        prompt: text.slice(0, MAX_INPUT_CHARS),
-        maxOutputTokens: 1000,
-        ...reasoning,
-    }));
+    // A title is a consequence of the turn, not part of it: it is ordinary
+    // opportunistic work. Firing it before the turn even registered its chat
+    // activity meant it ran concurrently with the very turn it names, and on a
+    // local model that is GPU time taken from the answer being typed.
+    const result = await backgroundScheduler.runOpportunistic(
+        'chat_title',
+        () => withUseCase({ useCase: 'copilot_chat', subUseCase: 'chat_title' }, () => generateText({
+            model,
+            system: SYSTEM_PROMPT,
+            prompt: text.slice(0, MAX_INPUT_CHARS),
+            maxOutputTokens: 1000,
+            ...reasoning,
+        })),
+    );
 
     const title = (result.text.trim().split(/\r?\n/)[0] ?? '')
         .trim()

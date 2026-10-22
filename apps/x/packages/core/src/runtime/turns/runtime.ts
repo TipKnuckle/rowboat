@@ -38,6 +38,8 @@ import {
     type CreateTurnInput,
     type ITurnRuntime,
     type TakeAddedInputs,
+    type ModelGate,
+    type AdvanceOptions,
     type Turn,
     TurnDependencyError,
     type TurnExecution,
@@ -205,7 +207,7 @@ export class TurnRuntime implements ITurnRuntime {
     advanceTurn(
         turnId: string,
         input?: TurnExternalInput,
-        options?: { signal?: AbortSignal; takeInputs?: TakeAddedInputs },
+        options?: AdvanceOptions,
     ): TurnExecution {
         const stream = new HotStream<TurnStreamEvent, TurnOutcome>();
         void this.turnRepo
@@ -222,7 +224,7 @@ export class TurnRuntime implements ITurnRuntime {
     private async advanceLocked(
         turnId: string,
         input: TurnExternalInput | undefined,
-        options: { signal?: AbortSignal; takeInputs?: TakeAddedInputs } | undefined,
+        options: AdvanceOptions | undefined,
         stream: HotStream<TurnStreamEvent, TurnOutcome>,
     ): Promise<TurnOutcome> {
         this.lifecycleBus.publish({ type: "turn-processing-start", turnId });
@@ -242,7 +244,7 @@ export class TurnRuntime implements ITurnRuntime {
     private async advance(
         turnId: string,
         input: TurnExternalInput | undefined,
-        options: { signal?: AbortSignal; takeInputs?: TakeAddedInputs } | undefined,
+        options: AdvanceOptions | undefined,
         stream: HotStream<TurnStreamEvent, TurnOutcome>,
     ): Promise<TurnOutcome> {
         const externalSignal = options?.signal;
@@ -318,6 +320,7 @@ export class TurnRuntime implements ITurnRuntime {
             resolveTool: (descriptor) => this.toolRegistry.resolve(descriptor),
             signal: controller.signal,
             takeInputs: options?.takeInputs,
+            modelGate: options?.modelGate,
             turnRepo: this.turnRepo,
             clock: this.clock,
             permissionChecker: this.permissionChecker,
@@ -376,6 +379,7 @@ class TurnAdvance {
     ) => Promise<RuntimeTool>;
     private readonly signal: AbortSignal;
     private readonly takeInputs: TakeAddedInputs | undefined;
+    private readonly modelGate: ModelGate | undefined;
     private readonly turnRepo: ITurnRepo;
     private readonly clock: IClock;
     private readonly permissionChecker: IPermissionChecker;
@@ -401,6 +405,7 @@ class TurnAdvance {
         ) => Promise<RuntimeTool>;
         signal: AbortSignal;
         takeInputs: TakeAddedInputs | undefined;
+        modelGate: ModelGate | undefined;
         turnRepo: ITurnRepo;
         clock: IClock;
         permissionChecker: IPermissionChecker;
@@ -417,6 +422,7 @@ class TurnAdvance {
         this.resolveTool = init.resolveTool;
         this.signal = init.signal;
         this.takeInputs = init.takeInputs;
+        this.modelGate = init.modelGate;
         this.turnRepo = init.turnRepo;
         this.clock = init.clock;
         this.permissionChecker = init.permissionChecker;
@@ -574,9 +580,31 @@ class TurnAdvance {
             if (exhausted) {
                 return exhausted;
             }
-            const settled = await this.runModelStep();
-            if (settled) {
-                return settled;
+            // Background scheduling: yield the hardware between steps. The
+            // step that just finished is already durable, so nothing is lost
+            // by waiting here; nothing further is requested — and no GPU time
+            // taken — until the gate clears and hands over the slot. Placed
+            // after failIfExhausted so a budget-rejected turn is never held
+            // open, and before the model_call_requested barrier is appended so
+            // the durable log never records a request that was not issued.
+            let releaseModelSlot: () => void = () => { };
+            try {
+                if (this.modelGate) {
+                    releaseModelSlot = await this.modelGate({
+                        modelCallIndex: this.state.modelCalls.length,
+                    });
+                    // The gate resolves rather than rejecting when aborted; the
+                    // loop's own idiom then takes the durable cancel path.
+                    if (this.signal.aborted) {
+                        return this.cancel();
+                    }
+                }
+                const settled = await this.runModelStep();
+                if (settled) {
+                    return settled;
+                }
+            } finally {
+                releaseModelSlot();
             }
         }
     }
@@ -813,6 +841,37 @@ class TurnAdvance {
         return [...this.resolvedContext, ...messages];
     }
 
+    /**
+     * Run a direct model call that is not a loop step under the same
+     * background gate the steps use.
+     *
+     * The auto-permission classifier is the only such call. Because it sits
+     * at loop level rather than inside runModelStep, it falls outside the held
+     * slot — which does not make it safe from contention, it makes it
+     * uncontrolled: an ungated classifier reaches the hardware whenever it
+     * likes, overlapping another background call or starting while the chat is
+     * active. So a background run queues for this call too.
+     *
+     * An interactive turn has no gate and is untouched — classification there
+     * is part of the user's own turn, and delaying it makes the chat slower
+     * rather than faster.
+     *
+     * Returns undefined when the caller aborted while waiting for the slot,
+     * leaving the caller to its own abort handling.
+     */
+    private async withModelSlot<T>(call: () => Promise<T>): Promise<T | undefined> {
+        if (!this.modelGate) return call();
+        const release = await this.modelGate({
+            modelCallIndex: this.state.modelCalls.length,
+        });
+        try {
+            if (this.signal.aborted) return undefined;
+            return await call();
+        } finally {
+            release();
+        }
+    }
+
     // §9.3: one classifier batch per model response in auto mode.
     // Checker-error calls and previously failed classifications skip the
     // classifier and go straight to the human/deny fallback.
@@ -834,20 +893,27 @@ class TurnAdvance {
         }
         let decisions;
         try {
-            decisions = await this.permissionClassifier.classify(
-                {
-                    turnId: this.turnId,
-                    messages: this.conversationSoFar(),
-                    requests: candidates.map((tc) => ({
-                        toolCallId: tc.toolCallId,
-                        toolName: tc.toolName,
-                        input: tc.input,
-                        request: (tc.permission as NonNullable<ToolCallState["permission"]>)
-                            .required.request,
-                    })),
-                },
-                this.signal,
+            decisions = await this.withModelSlot(() =>
+                this.permissionClassifier.classify(
+                    {
+                        turnId: this.turnId,
+                        messages: this.conversationSoFar(),
+                        requests: candidates.map((tc) => ({
+                            toolCallId: tc.toolCallId,
+                            toolName: tc.toolName,
+                            input: tc.input,
+                            request: (tc.permission as NonNullable<ToolCallState["permission"]>)
+                                .required.request,
+                        })),
+                    },
+                    this.signal,
+                ),
             );
+            // Aborted while queued for the slot: leave the batch unresolved
+            // and let the loop's own abort check take the cancel path.
+            if (decisions === undefined) {
+                return;
+            }
         } catch (error) {
             if (this.signal.aborted) {
                 return;

@@ -48,6 +48,39 @@ export interface AddedInput {
 }
 export type TakeAddedInputs = () => AddedInput[] | Promise<AddedInput[]>;
 
+// Background scheduling: a caller-supplied gate the advance awaits at each
+// model-call boundary, immediately before the next step is requested. Same
+// plumbing and same lifetime as takeInputs — ephemeral, per-invocation, never
+// durable — and the same role as the dual of the abort signal: both are
+// channels into a live advance that leave no trace unless acted on.
+//
+// Contract: resolve when it is safe to issue a model call, OR when the
+// advance's signal aborts. It must not reject on abort — the loop checks
+// signal.aborted right after and takes its own durable cancel path, and a
+// rejection here would surface a cancellation as a model failure.
+//
+// It resolves with a release invoked when that step settles, on every path
+// including throw and abort. The gate HOLDS the slot across the model call
+// rather than merely preceding it: that is what makes "one background model
+// call at a time" true, and it is why the gate wraps `runModelStep` instead of
+// the whole run. A background run waiting on a tool therefore does not sit on
+// the hardware.
+//
+// Omitting the gate means "never wait", which is what every interactive turn,
+// every manual run, and every subagent does. Deferral is declared by the
+// ENTRY POINT that schedules background work, not inferred from the turn:
+// sessionId === null is not a safe proxy, because a subagent spawned from a
+// live chat is also session-less and must never be deferred.
+export type ModelGate = (
+    info: { modelCallIndex: number },
+) => Promise<() => void>;
+
+export interface AdvanceOptions {
+    signal?: AbortSignal;
+    takeInputs?: TakeAddedInputs;
+    modelGate?: ModelGate;
+}
+
 // Exactly one external input per advanceTurn invocation.
 export type TurnExternalInput =
     | {
@@ -112,7 +145,7 @@ export interface ITurnRuntime {
     advanceTurn(
         turnId: string,
         input?: TurnExternalInput,
-        options?: { signal?: AbortSignal; takeInputs?: TakeAddedInputs },
+        options?: AdvanceOptions,
     ): TurnExecution;
     getTurn(turnId: string): Promise<Turn>;
     // Removes the turn's file. Idempotent — a missing turn is not an error.

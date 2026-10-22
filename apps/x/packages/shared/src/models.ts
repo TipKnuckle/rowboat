@@ -73,6 +73,40 @@ export const TaskModels = z.object({
 export type TaskModelKey = keyof z.infer<typeof TaskModels>;
 
 /**
+ * How background model calls (knowledge pipeline, memory consolidation, chat
+ * titles, event routing, scheduled tasks) share the hardware with chat. On a
+ * local model they contend for the same GPU, and the work is never urgent.
+ *
+ * `off` and `immediate` are deliberately separate values, not a checkbox and
+ * a zero: "let background work overlap the chat" and "start it the moment the
+ * chat finishes" are different behaviors, and collapsing them is what made
+ * the old boolean useless on local hardware — it released queued work at zero
+ * idle, exactly when the user starts typing again.
+ *
+ * Only the durations above `immediate` read a quiet period, so there is one
+ * knob for every background caller rather than a timer per task.
+ */
+export const BackgroundScheduling = z.enum(["off", "immediate", "30s", "1m", "5m", "15m"]);
+export type BackgroundScheduling = z.infer<typeof BackgroundScheduling>;
+
+/** Quiet period per setting; absent for the two settings that read none. */
+export const BACKGROUND_QUIET_PERIOD_MS: Partial<Record<BackgroundScheduling, number>> = {
+  "30s": 30_000,
+  "1m": 60_000,
+  "5m": 300_000,
+  "15m": 900_000,
+};
+
+export const BACKGROUND_SCHEDULING_ORDER: BackgroundScheduling[] = [
+  "off",
+  "immediate",
+  "30s",
+  "1m",
+  "5m",
+  "15m",
+];
+
+/**
  * models.json, version 2.
  *
  * The design: providers carry credentials only (keyed by instance id, with
@@ -101,9 +135,13 @@ export const LlmModelConfig = z.object({
   // with the gateway's image model on Rowboat sign-in; while absent the
   // tool is unavailable until one is picked in model settings.
   imageModel: ModelRef.optional(),
-  // When true, background agent runs (knowledge pipeline, live notes,
-  // background tasks) wait until no chat turn is running before starting.
-  // Surfaced as a settings checkbox; recommended for local models, where a
-  // background run competes with the chat for the same hardware.
+  // How background model calls share the hardware with chat. Absent means
+  // "derive from the legacy `deferBackgroundTasks` flag" — see
+  // core/models/defaults.ts getBackgroundScheduling, which keeps preferences
+  // for both v1-migrated and already-v2 files. Surfaced as a settings select.
+  backgroundScheduling: BackgroundScheduling.optional(),
+  // Legacy: superseded by `backgroundScheduling`, which separates "allow
+  // overlap" from "run when the chat finishes". Kept readable so an existing
+  // preference survives; dropped the first time the new key is written.
   deferBackgroundTasks: z.boolean().optional(),
 });

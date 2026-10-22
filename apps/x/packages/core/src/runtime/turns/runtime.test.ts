@@ -3508,3 +3508,185 @@ describe("added inputs (steering)", () => {
         ]);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Background model gate: cooperative yield between model calls
+// ---------------------------------------------------------------------------
+
+describe("background model gate", () => {
+    const poll = async (predicate: () => boolean): Promise<void> => {
+        for (let i = 0; i < 500; i++) {
+            if (predicate()) return;
+            await new Promise((resolve) => setTimeout(resolve, 2));
+        }
+        throw new Error("gate never reached the expected state");
+    };
+
+    it("is consulted before every step and released after each one settles", async () => {
+        const seen: number[] = [];
+        let released = 0;
+        const { runtime } = makeRuntime({
+            models: [
+                respond(completedResp(assistantCalls(toolCallPart("tc1", "echo")))),
+                respond(completedResp(assistantText("done"))),
+            ],
+        });
+        const turnId = await newTurn(runtime);
+        const { outcome } = await advanceAndSettle(runtime, turnId, undefined, {
+            modelGate: async ({ modelCallIndex }) => {
+                seen.push(modelCallIndex);
+                return () => {
+                    released++;
+                };
+            },
+        });
+
+        expect(outcome?.status).toBe("completed");
+        // One gate passage per model call — not one per run. That is what lets
+        // a long multi-step background run stop taking hardware the moment a
+        // human starts talking.
+        expect(seen).toEqual([0, 1]);
+        expect(released).toBe(2);
+    });
+
+    it("holds the line between steps: no request is durable until the gate clears", async () => {
+        let requests = 0;
+        let openGate: () => void = () => { };
+        const { runtime, repo } = makeRuntime({
+            models: [
+                respond(completedResp(assistantCalls(toolCallPart("tc1", "echo")))),
+                respond(completedResp(assistantText("done"))),
+            ],
+        });
+        const turnId = await newTurn(runtime);
+        const execution = runtime.advanceTurn(turnId, undefined, {
+            modelGate: async () => {
+                requests++;
+                if (requests === 2) {
+                    await new Promise<void>((resolve) => {
+                        openGate = resolve;
+                    });
+                }
+                return () => { };
+            },
+        });
+
+        await poll(() => requests === 2);
+        // The tool settled and the turn is nowhere near complete, yet the
+        // second request has not been appended: the durable log never records
+        // a model call that was not actually issued.
+        expect(typesOf(await persisted(repo, turnId))).toEqual([
+            "turn_created",
+            "model_call_requested",
+            "model_call_completed",
+            "tool_invocation_requested",
+            "tool_result",
+        ]);
+
+        openGate();
+        const { outcome } = await settle(execution);
+        expect(outcome?.status).toBe("completed");
+        expect(typesOf(await persisted(repo, turnId))).toContain("turn_completed");
+    });
+
+    it("aborts out of the gate and cancels without issuing the deferred step", async () => {
+        const controller = new AbortController();
+        let parked: () => void = () => { };
+        const inGate = new Promise<void>((resolve) => {
+            parked = resolve;
+        });
+        const { runtime, repo } = makeRuntime({
+            models: [
+                respond(completedResp(assistantCalls(toolCallPart("tc1", "echo")))),
+                respond(completedResp(assistantText("done"))),
+            ],
+        });
+        const turnId = await newTurn(runtime);
+        const execution = runtime.advanceTurn(turnId, undefined, {
+            signal: controller.signal,
+            modelGate: async ({ modelCallIndex }) => {
+                if (modelCallIndex === 1) {
+                    parked();
+                    // The gate's contract: resolve on abort rather than reject,
+                    // so the loop takes its own durable cancel path.
+                    await new Promise<void>((resolve) => {
+                        controller.signal.addEventListener("abort", () => resolve(), {
+                            once: true,
+                        });
+                    });
+                }
+                return () => { };
+            },
+        });
+
+        await inGate;
+        controller.abort();
+        const { outcome } = await settle(execution);
+
+        expect(outcome?.status).toBe("cancelled");
+        const log = await persisted(repo, turnId);
+        expect(typesOf(log).filter((t) => t === "model_call_requested")).toHaveLength(1);
+        expect(typesOf(log)).toContain("turn_cancelled");
+        expect(typesOf(log)).not.toContain("turn_completed");
+    });
+
+    it("routes a background run's permission classification through the gate", async () => {
+        // The classifier is a model call that sits at loop level, outside the
+        // held slot. That did not make it safe from contention — it made it
+        // uncontrolled: it could overlap another background call or start
+        // while the chat was active.
+        let gateCalls = 0;
+        let openGate: () => void = () => { };
+        const { runtime, classifier } = makeRuntime({
+            models: [
+                respond(completedResp(assistantCalls(toolCallPart("CA", "echo")))),
+                respond(completedResp(assistantText("done"))),
+            ],
+            checker: new FakePermissionChecker({
+                echo: { request: { kind: "command" } },
+            }),
+            classifier: new FakePermissionClassifier((requests) =>
+                requests.map((r) => ({
+                    toolCallId: r.toolCallId,
+                    decision: "allow" as const,
+                    reason: "auto",
+                })),
+            ),
+        });
+        const turnId = await newTurn(runtime, {
+            config: { humanAvailable: false, autoPermission: true },
+        });
+        const execution = runtime.advanceTurn(turnId, undefined, {
+            modelGate: async () => {
+                gateCalls++;
+                if (gateCalls === 2) {
+                    await new Promise<void>((resolve) => {
+                        openGate = resolve;
+                    });
+                }
+                return () => { };
+            },
+        });
+
+        // Gate #1 is step 0; gate #2 is the classifier's own call. Parked
+        // there, the classifier has issued nothing yet.
+        await poll(() => gateCalls === 2);
+        expect(classifier.batches).toHaveLength(0);
+
+        openGate();
+        const { outcome } = await settle(execution);
+        expect(outcome?.status).toBe("completed");
+        expect(classifier.batches).toHaveLength(1);
+    });
+
+    it("is never consulted when the caller does not declare background work", async () => {
+        // Interactive turns, manual runs and subagents pass no gate: they must
+        // not wait on a queue they were never meant to join.
+        const { runtime } = makeRuntime({
+            models: [respond(completedResp(assistantText("done")))],
+        });
+        const turnId = await newTurn(runtime);
+        const { outcome } = await advanceAndSettle(runtime, turnId);
+        expect(outcome?.status).toBe("completed");
+    });
+});

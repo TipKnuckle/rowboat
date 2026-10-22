@@ -1,4 +1,5 @@
-import { LlmModelConfig, LlmProvider, ModelRef, ModelSelection, TaskModels } from "@x/shared/dist/models.js";
+import { BackgroundScheduling, LlmModelConfig, LlmProvider, ModelRef, ModelSelection, TaskModels } from "@x/shared/dist/models.js";
+import { backgroundScheduler } from "../application/lib/background-scheduler.js";
 import { WorkDir } from "../config/config.js";
 import { isSignedIn } from "../account/account.js";
 import { migrateModelsConfig } from "./migrate.js";
@@ -19,7 +20,7 @@ export type ModelConfigPatch = {
     assistantModel?: Choice | null;
     taskModels?: TaskModelPatch;
     imageModel?: Ref | null;
-    deferBackgroundTasks?: boolean | null;
+    backgroundScheduling?: BackgroundScheduling | null;
 };
 
 export interface IModelConfigRepo {
@@ -151,11 +152,22 @@ export class FSModelConfigRepo implements IModelConfigRepo {
             if (patch.imageModel === null) delete config.imageModel;
             else config.imageModel = patch.imageModel;
         }
-        if (patch.deferBackgroundTasks !== undefined) {
-            if (patch.deferBackgroundTasks === null) delete config.deferBackgroundTasks;
-            else config.deferBackgroundTasks = patch.deferBackgroundTasks;
+        if (patch.backgroundScheduling !== undefined) {
+            if (patch.backgroundScheduling === null) delete config.backgroundScheduling;
+            else config.backgroundScheduling = patch.backgroundScheduling;
+            // The new key is now the source of truth; leaving the legacy flag
+            // behind would leave two settings that can disagree.
+            delete config.deferBackgroundTasks;
         }
         await this.write(config);
+        if (patch.backgroundScheduling !== undefined) {
+            // The write funnel is the only place a policy change can be
+            // announced from, and it has to be announced: work already parked
+            // in the queue waits against the threshold it captured, so moving
+            // 15m to immediate would otherwise change nothing for exactly the
+            // work the user is reacting to.
+            backgroundScheduler.wake();
+        }
     }
 
     private async read(): Promise<Config> {

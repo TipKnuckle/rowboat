@@ -3,6 +3,7 @@ import { events, PrefixLogger } from '@x/shared';
 import { generateObjectSafe } from '../models/structured.js';
 import type { RowboatEvent } from '@x/shared/dist/events.js';
 import { withUseCase, type UseCase } from '../analytics/use_case.js';
+import { backgroundScheduler } from '../application/lib/background-scheduler.js';
 import type { EventConsumerTarget } from './consumer.js';
 
 const log = new PrefixLogger('Events:Routing');
@@ -25,6 +26,8 @@ export interface RouteBatchOptions {
     /** Resolver returning the LLM to use for routing. Each consumer provides its own
      *  so model selection stays aligned with the consumer's agent model. */
     resolveModel: () => Promise<{ model: LanguageModel; modelId: string; providerName: string }>;
+    /** Cancels a wait for the model slot. Optional; routing is usually fire-and-forget. */
+    signal?: AbortSignal;
 }
 
 function buildSystemPrompt(opts: Pick<RouteBatchOptions, 'entitySingular' | 'entityPlural'>): string {
@@ -88,13 +91,25 @@ export async function routeBatch(
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {
         const batch = targets.slice(i, i + BATCH_SIZE);
         try {
-            const result = await withUseCase({ useCase: opts.useCase, subUseCase: 'routing' }, () => generateObjectSafe({
-                model,
-                system: systemPrompt,
-                prompt: buildPrompt(event, batch, opts.entityPlural),
-                schema: events.Pass1OutputSchema,
-                retry: true,
-            }));
+            // Each batch is its own slot request. "Effort-free" in
+            // resolveRoutingModel only means low reasoning effort — the slot
+            // still inherits the assistant model, so a cheap yes/no pass ran
+            // on the large local model and, for an event with 41 eligible
+            // targets, three of them went back to back before any real work
+            // started. Gating per batch rather than per event means a long
+            // routing pass yields between calls instead of holding the
+            // hardware for the whole loop.
+            const result = await backgroundScheduler.runOpportunistic(
+                `routing:${opts.entitySingular} batch`,
+                () => withUseCase({ useCase: opts.useCase, subUseCase: 'routing' }, () => generateObjectSafe({
+                    model,
+                    system: systemPrompt,
+                    prompt: buildPrompt(event, batch, opts.entityPlural),
+                    schema: events.Pass1OutputSchema,
+                    retry: true,
+                })),
+                opts.signal,
+            );
             for (const id of result.object.ids) {
                 matched.add(id);
             }

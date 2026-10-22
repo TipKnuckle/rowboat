@@ -4,6 +4,7 @@ import { WorkDir } from '../config/config.js';
 import { runWhenPossible } from '../runtime/assembly/headless-app.js';
 import { asRunModelOptions, getKgModel } from '../models/defaults.js';
 import { getErrorDetails } from '../application/lib/errors.js';
+import { backgroundScheduler } from '../application/lib/background-scheduler.js';
 import { serviceLogger } from '../services/service_logger.js';
 import { loadUserConfig, updateUserEmail } from '../config/user_config.js';
 import { GoogleClientFactory } from './google-client-factory.js';
@@ -16,7 +17,7 @@ import {
     type AgentNotesState,
 } from './agent_notes_state.js';
 
-const SYNC_INTERVAL_MS = 10 * 1000; // 10 seconds (for testing)
+const SYNC_INTERVAL_MS = 10 * 1000; // how often a pass is REQUESTED, not when it runs
 const EMAIL_BATCH_SIZE = 5;
 const RUNS_BATCH_SIZE = 5;
 const GMAIL_SYNC_DIR = path.join(WorkDir, 'gmail_sync');
@@ -98,21 +99,45 @@ function extractUserPartsFromEmail(content: string, userEmail: string): string |
 
 // --- Inbox reading ---
 
-function readInbox(): string[] {
-    if (!fs.existsSync(INBOX_FILE)) {
-        return [];
-    }
-    const content = fs.readFileSync(INBOX_FILE, 'utf-8').trim();
-    if (!content) {
-        return [];
-    }
-    return content.split('\n').filter(l => l.trim());
+interface InboxSnapshot {
+    entries: string[];
+    /**
+     * Total lines seen at read time — the acknowledge boundary used by
+     * clearInbox. Counted before filtering blanks so the index lines up with
+     * what clearInbox re-reads.
+     */
+    lines: number;
 }
 
-function clearInbox(): void {
-    if (fs.existsSync(INBOX_FILE)) {
-        fs.writeFileSync(INBOX_FILE, '');
+function readInbox(): InboxSnapshot {
+    if (!fs.existsSync(INBOX_FILE)) {
+        return { entries: [], lines: 0 };
     }
+    const lines = fs.readFileSync(INBOX_FILE, 'utf-8').split('\n');
+    return { entries: lines.filter(l => l.trim()), lines: lines.length };
+}
+
+/**
+ * Acknowledge only the lines this pass actually read.
+ *
+ * save-to-memory appends one line at a time, and the pass snapshots its input
+ * before the model call and acknowledges after it returns. With opportunistic
+ * scheduling that window is minutes rather than seconds, so clearing the whole
+ * file would silently discard notes the agent saved while the consolidation
+ * run was queued or in flight. Anything appended after the snapshot stays for
+ * the next pass.
+ */
+function clearInbox(consumedLines: number): void {
+    if (consumedLines <= 0 || !fs.existsSync(INBOX_FILE)) {
+        return;
+    }
+    const remaining = fs
+        .readFileSync(INBOX_FILE, 'utf-8')
+        .split('\n')
+        .slice(consumedLines)
+        .join('\n')
+        .trim();
+    fs.writeFileSync(INBOX_FILE, remaining ? `${remaining}\n` : '');
 }
 
 // --- Copilot run scanning ---
@@ -254,10 +279,10 @@ async function processAgentNotes(): Promise<void> {
     }
 
     // 2. Inbox entries
-    const inboxEntries = readInbox();
-    if (inboxEntries.length > 0) {
+    const inbox = readInbox();
+    if (inbox.entries.length > 0) {
         messageParts.push(`## Notes from the assistant (save-to-memory inbox)\n`);
-        messageParts.push(inboxEntries.join('\n'));
+        messageParts.push(inbox.entries.join('\n'));
     }
 
     // 3. Copilot conversations
@@ -309,8 +334,8 @@ async function processAgentNotes(): Promise<void> {
         for (const r of newRuns) {
             markRunProcessed(r, state);
         }
-        if (inboxEntries.length > 0) {
-            clearInbox();
+        if (inbox.entries.length > 0) {
+            clearInbox(inbox.lines);
         }
 
         state.lastRunTime = new Date().toISOString();
@@ -326,7 +351,7 @@ async function processAgentNotes(): Promise<void> {
             outcome: 'ok',
             summary: {
                 emails: emailPaths.length,
-                inboxEntries: inboxEntries.length,
+                inboxEntries: inbox.entries.length,
                 copilotRuns: runsToProcess.length,
             },
         });
@@ -354,18 +379,37 @@ async function processAgentNotes(): Promise<void> {
 
 // --- Entry point ---
 
+/** One coalesced consolidation pass, deduplicated by this key. */
+const JOB_KEY = 'knowledge:agent_notes';
+
+/**
+ * Request a consolidation pass.
+ *
+ * The poll only ever *requests* work. A pass already queued or in flight
+ * absorbs the request instead of stacking a second full agent turn behind it,
+ * so ten save-to-memory notes while you chat become one pending consolidation
+ * rather than ten — which matters because each pass is a whole agent turn of
+ * work triggered by a single appended bullet.
+ */
+function requestAgentNotesSync(): void {
+    backgroundScheduler.enqueue(JOB_KEY, processAgentNotes);
+}
+
 export async function init() {
     console.log('[AgentNotes] Starting Agent Notes Service...');
-    console.log(`[AgentNotes] Will process every ${SYNC_INTERVAL_MS / 1000} seconds`);
+    console.log(`[AgentNotes] Will check for new material every ${SYNC_INTERVAL_MS / 1000} seconds`);
 
-    // Initial run
-    await processAgentNotes();
+    requestAgentNotesSync();
 
-    // Periodic polling
+    // Polling stays. An empty poll never reaches the model — the processor
+    // returns when there is nothing new — so now that model access is gated,
+    // this interval no longer decides when GPU work starts. Replacing it with
+    // a write-time signal is a responsiveness change, not a contention one,
+    // and keeps its value as a reconciliation path for missed changes.
     while (true) {
         await new Promise(resolve => setTimeout(resolve, SYNC_INTERVAL_MS));
         try {
-            await processAgentNotes();
+            requestAgentNotesSync();
         } catch (error) {
             console.error('[AgentNotes] Error in main loop:', error);
         }

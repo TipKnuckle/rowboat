@@ -8,7 +8,7 @@ import { DeckOutline, DeckOutlineSlide, EditSlideRequest, GenerateDeckOutlineReq
 import { RelPath, Encoding, Stat, DirEntry, ReaddirOptions, ReadFileResult, WorkspaceChangeEvent, WriteFileOptions, WriteFileResult, RemoveOptions } from './workspace.js';
 import { ListToolsResponse } from './mcp.js';
 import { AskHumanResponsePayload, CreateRunOptions, Run, ListRunsResponse, ToolPermissionAuthorizePayload } from './runs.js';
-import { LlmProvider, ModelRef, ModelSelection, ReasoningEffort } from './models.js';
+import { LlmModelConfig, LlmProvider, ModelRef, ModelSelection, ReasoningEffort, BackgroundScheduling } from './models.js';
 import { AgentScheduleConfig, AgentScheduleEntry } from './agent-schedule.js';
 import { AgentScheduleState } from './agent-schedule-state.js';
 import { ServiceEvent } from './service-events.js';
@@ -1055,7 +1055,7 @@ export const ipcSchemas = {
       // The generate-image model — a bare ref (image models take no
       // effort). Null = unset: image generation is unavailable.
       imageModel: ModelRef.nullable(),
-      deferBackgroundTasks: z.boolean(),
+      backgroundScheduling: BackgroundScheduling,
     }),
   },
   // Partial merge of model selections into models.json. Omitted keys are
@@ -1074,7 +1074,7 @@ export const ipcSchemas = {
         subagent: ModelSelection.nullable().optional(),
       }).optional(),
       imageModel: ModelRef.nullable().optional(),
-      deferBackgroundTasks: z.boolean().nullable().optional(),
+      backgroundScheduling: BackgroundScheduling.nullable().optional(),
     }),
     res: z.object({
       success: z.literal(true),

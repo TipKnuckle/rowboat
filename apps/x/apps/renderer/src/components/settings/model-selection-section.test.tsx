@@ -57,7 +57,7 @@ function serve(opts: {
     assistantModel: opts.assistant ?? null,
     taskModels: { ...EMPTY_TASKS, ...(opts.taskModels ?? {}) },
     imageModel: opts.imageModel ?? null,
-    deferBackgroundTasks: false,
+    backgroundScheduling: "off",
   })
   handlers['models:listImageModels'] = async () => {
     imageCatalogCalls += 1

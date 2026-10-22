@@ -23,6 +23,7 @@ import {
 } from "@x/shared/dist/turns.js";
 import type { IMonotonicallyIncreasingIdGenerator } from "../../application/lib/id-gen.js";
 import { chatActivity } from "../../application/lib/chat-activity.js";
+import { abortHeadlessRun } from "../../application/lib/headless-run-registry.js";
 import {
     type AddedInput,
     type ITurnRuntime,
@@ -552,6 +553,16 @@ export class SessionsImpl implements ISessions {
             await Promise.all(
                 advances.map((a) => a.execution.outcome.catch(() => undefined)),
             );
+            return;
+        }
+        // Not a session advance we hold — but it may be a headless run, which
+        // owns its own controller. Abort it there: the durable cancel below
+        // would queue behind the per-turn lock the live advance holds, and a
+        // background run parked in the scheduler waiting for a quiet window
+        // holds that lock for as long as it waits.
+        const interrupted = abortHeadlessRun(turnId, reason ?? "stopped");
+        if (interrupted) {
+            await interrupted;
             return;
         }
         try {

@@ -4,10 +4,11 @@ import { ArrowLeft, CheckCircle2, Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { providerDisplayNames, type ModelRef } from "@/components/model-selector"
 import { selectInitialModel, selectInitialTaskModels } from "@x/shared/dist/initial-selection.js"
+import { BACKGROUND_SCHEDULING_ORDER, type BackgroundScheduling } from "@x/shared/dist/models.js"
 import type { ModelRecommendations } from "@x/shared/dist/rowboat-account.js"
 import { useModels } from "@/hooks/use-models"
 import { useRowboatConfig } from "@/hooks/use-rowboat-config"
@@ -29,6 +30,19 @@ import {
 // ModelSelectionSection above this section.
 
 type ByokFlavor = "openai" | "anthropic" | "google" | "openrouter" | "aigateway" | "ollama" | "openai-compatible"
+
+// Settings copy for the background scheduling select. "off" and "immediate"
+// are separate choices on purpose — letting background work overlap the chat
+// and starting it the moment the chat ends are different behaviors, and the
+// old checkbox conflated them into "on" with a zero wait.
+const BACKGROUND_SCHEDULING_LABELS: Record<BackgroundScheduling, string> = {
+  off: "Let it overlap the chat",
+  immediate: "Start when the chat finishes",
+  "30s": "Wait 30 seconds after the chat",
+  "1m": "Wait 1 minute after the chat",
+  "5m": "Wait 5 minutes after the chat",
+  "15m": "Wait 15 minutes after the chat",
+}
 
 interface ProviderMeta {
   id: string
@@ -87,7 +101,7 @@ export function ProvidersSection({ dialogOpen, variant = "settings" }: {
 
   const [providersMeta, setProvidersMeta] = useState<ProviderMeta[]>([])
   const [selections, setSelections] = useState<Selections>({ assistantModel: null, taskModels: {} })
-  const [deferBackgroundTasks, setDeferBackgroundTasks] = useState(false)
+  const [backgroundScheduling, setBackgroundScheduling] = useState<BackgroundScheduling>("off")
   const [addOpen, setAddOpen] = useState(false)
   const [manageId, setManageId] = useState<string | null>(null)
 
@@ -96,7 +110,7 @@ export function ProvidersSection({ dialogOpen, variant = "settings" }: {
       const cfg = await window.ipc.invoke("models:getConfig", null)
       setProvidersMeta(cfg.providers)
       setSelections({ assistantModel: cfg.assistantModel, taskModels: cfg.taskModels })
-      setDeferBackgroundTasks(cfg.deferBackgroundTasks)
+      setBackgroundScheduling(cfg.backgroundScheduling)
     } catch { /* fresh install */ }
   }, [])
 
@@ -148,10 +162,10 @@ export function ProvidersSection({ dialogOpen, variant = "settings" }: {
     return rows
   }, [selections])
 
-  const handleDeferToggle = useCallback(async (value: boolean) => {
-    setDeferBackgroundTasks(value)
+  const handleBackgroundSchedulingChange = useCallback(async (value: BackgroundScheduling) => {
+    setBackgroundScheduling(value)
     try {
-      await window.ipc.invoke("models:updateConfig", { deferBackgroundTasks: value })
+      await window.ipc.invoke("models:updateConfig", { backgroundScheduling: value })
       window.dispatchEvent(new Event("models-config-changed"))
     } catch {
       toast.error("Failed to save setting")
@@ -205,16 +219,29 @@ export function ProvidersSection({ dialogOpen, variant = "settings" }: {
         Add provider
       </Button>
 
-      {/* Defer background tasks while chatting */}
+      {/* Background model work */}
       {variant === "settings" && (
-        <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2.5">
-          <div className="min-w-0">
-            <div className="text-sm font-medium">Defer background tasks while chatting</div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Background agents wait until no chat is running. Recommended for local models.
-            </div>
+        <div className="space-y-2 rounded-md border px-3 py-2.5">
+          <div className="text-sm font-medium">Background model work</div>
+          <div className="text-xs text-muted-foreground">
+            Memory consolidation, the knowledge graph, chat titles and event routing all
+            use the same model as your chat. On a local model they share one GPU with it.
           </div>
-          <Switch checked={deferBackgroundTasks} onCheckedChange={handleDeferToggle} />
+          <Select
+            value={backgroundScheduling}
+            onValueChange={(value) => handleBackgroundSchedulingChange(value as BackgroundScheduling)}
+          >
+            <SelectTrigger className="w-full" aria-label="Background model work">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BACKGROUND_SCHEDULING_ORDER.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {BACKGROUND_SCHEDULING_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 

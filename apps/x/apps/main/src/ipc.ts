@@ -63,7 +63,7 @@ import { getPairingInfo, rotateKey as rotateServerKey, setLanEnabled as setServe
 import { testModelConnection, listModelsForProvider, generateOneShot } from '@x/core/dist/models/models.js';
 import { getImageModelCatalog, getModelCatalog } from '@x/core/dist/models/catalog.js';
 import { checkRecommendationUpdate, markRecommendationSeen, resolveRecommendationUpdate } from '@x/core/dist/models/recommendation-update.js';
-import { getDefaultModelAndProvider } from '@x/core/dist/models/defaults.js';
+import { getDefaultModelAndProvider, getBackgroundScheduling } from '@x/core/dist/models/defaults.js';
 import { isSignedIn } from '@x/core/dist/account/account.js';
 import type { IModelConfigRepo } from '@x/core/dist/models/repo.js';
 import type { IOAuthRepo } from '@x/core/dist/auth/repo.js';
@@ -1633,7 +1633,9 @@ export function setupIpcHandlers() {
           subagent: tasks.subagent ?? null,
         },
         imageModel: cfg?.imageModel ?? null,
-        deferBackgroundTasks: cfg?.deferBackgroundTasks === true,
+        // Resolved, not read raw: an absent key falls back to the legacy
+        // deferBackgroundTasks flag so an existing preference survives.
+        backgroundScheduling: await getBackgroundScheduling(),
       };
     },
     'models:setProvider': async (_event, args) => {

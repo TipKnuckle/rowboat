@@ -6,7 +6,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 describe("ChatActivity", () => {
     it("resolves waiters immediately when idle", async () => {
         const activity = new ChatActivity();
-        await activity.waitUntilIdle();
+        await activity.waitUntilQuiet(0);
         expect(activity.activeCount).toBe(0);
     });
 
@@ -16,7 +16,7 @@ describe("ChatActivity", () => {
         activity.enter();
 
         let released = false;
-        const waiting = activity.waitUntilIdle().then(() => {
+        const waiting = activity.waitUntilQuiet(0).then(() => {
             released = true;
         });
 
@@ -33,8 +33,8 @@ describe("ChatActivity", () => {
         const activity = new ChatActivity();
         activity.enter();
         const results: number[] = [];
-        const a = activity.waitUntilIdle().then(() => results.push(1));
-        const b = activity.waitUntilIdle().then(() => results.push(2));
+        const a = activity.waitUntilQuiet(0).then(() => results.push(1));
+        const b = activity.waitUntilQuiet(0).then(() => results.push(2));
         activity.exit();
         await Promise.all([a, b]);
         expect(results.sort()).toEqual([1, 2]);

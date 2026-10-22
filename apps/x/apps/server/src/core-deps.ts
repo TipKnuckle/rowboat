@@ -21,7 +21,7 @@ import * as runsCore from '@x/core/dist/runtime/legacy/runs.js';
 import { getModelCatalog } from '@x/core/dist/models/catalog.js';
 import { listModelsForProvider } from '@x/core/dist/models/models.js';
 import type { IModelConfigRepo } from '@x/core/dist/models/repo.js';
-import { getDefaultModelAndProvider } from '@x/core/dist/models/defaults.js';
+import { getDefaultModelAndProvider, getBackgroundScheduling } from '@x/core/dist/models/defaults.js';
 import type { IGranolaConfigRepo } from '@x/core/dist/knowledge/granola/repo.js';
 import { knowledgeSourcesRepo } from '@x/core/dist/knowledge/sources/repo.js';
 import { isOnboardingComplete } from '@x/core/dist/config/note_creation_config.js';
@@ -260,7 +260,9 @@ export function createCoreRpcHandlers(opts?: { sessionsIndexReady?: Promise<void
           subagent: tasks.subagent ?? null,
         },
         imageModel: cfg?.imageModel ?? null,
-        deferBackgroundTasks: cfg?.deferBackgroundTasks === true,
+        // Resolved, not read raw: an absent key falls back to the legacy
+        // deferBackgroundTasks flag so an existing preference survives.
+        backgroundScheduling: await getBackgroundScheduling(),
       };
     },
     'llm:getDefaultModel': async () => getDefaultModelAndProvider(),

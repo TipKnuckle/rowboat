@@ -70,7 +70,7 @@ describe('FSModelConfigRepo data safety', () => {
             providers: { weird: { flavor: 'not-a-flavor', apiKey: 'sk-precious' } },
         }));
         const repo = new FSModelConfigRepo();
-        await expect(repo.updateConfig({ deferBackgroundTasks: true })).rejects.toThrow();
+        await expect(repo.updateConfig({ backgroundScheduling: "immediate" })).rejects.toThrow();
         // The file is untouched — the key survives.
         expect((await fs.readFile(configPath, 'utf8'))).toContain('sk-precious');
     });
@@ -109,5 +109,41 @@ describe('FSModelConfigRepo imageModel', () => {
         await repo.updateConfig({ imageModel: { provider: 'rowboat', model: 'google/gemini-2.5-flash-image' } });
         await repo.updateConfig({ imageModel: null });
         expect((await repo.getConfig()).imageModel).toBeUndefined();
+    });
+});
+
+describe('backgroundScheduling writes', () => {
+    it('dropping the legacy flag on first write leaves one source of truth', async () => {
+        // Two settings that can disagree is how the old checkbox ended up
+        // meaning "wait for the chat, then release everything at once".
+        await fs.writeFile(
+            configPath,
+            JSON.stringify({ version: 2, providers: {}, deferBackgroundTasks: true }),
+        );
+        const repo = new FSModelConfigRepo();
+        await repo.updateConfig({ backgroundScheduling: '5m' });
+
+        const stored = JSON.parse(await fs.readFile(configPath, 'utf8'));
+        expect(stored.backgroundScheduling).toBe('5m');
+        expect(stored.deferBackgroundTasks).toBeUndefined();
+    });
+
+    it('an unrelated write leaves the legacy flag readable', async () => {
+        await fs.writeFile(
+            configPath,
+            JSON.stringify({ version: 2, providers: {}, deferBackgroundTasks: true }),
+        );
+        const repo = new FSModelConfigRepo();
+        await repo.updateConfig({ imageModel: { provider: 'openai', model: 'gpt-image' } });
+
+        expect(JSON.parse(await fs.readFile(configPath, 'utf8')).deferBackgroundTasks).toBe(true);
+    });
+
+    it('null clears the setting back to the derived default', async () => {
+        const repo = new FSModelConfigRepo();
+        await repo.ensureConfig();
+        await repo.updateConfig({ backgroundScheduling: '1m' });
+        await repo.updateConfig({ backgroundScheduling: null });
+        expect((await repo.getConfig()).backgroundScheduling).toBeUndefined();
     });
 });
